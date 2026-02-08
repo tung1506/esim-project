@@ -33,6 +33,7 @@ class FlutterEsimWebViewFactory: NSObject, FlutterPlatformViewFactory {
 
 class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, WKScriptMessageHandler {
     private var _webView: WKWebView
+    private var _containerView: UIView
     private var methodChannel: FlutterMethodChannel
     
     init(
@@ -43,6 +44,10 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         methodChannel: FlutterMethodChannel
     ) {
         self.methodChannel = methodChannel
+        
+        // Create container view
+        _containerView = UIView(frame: frame)
+        _containerView.backgroundColor = UIColor.white
         
         // Configure WKWebView
         let configuration = WKWebViewConfiguration()
@@ -61,22 +66,36 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         // Media types requiring user action
         configuration.mediaTypesRequiringUserActionForPlayback = []
         
-        _webView = WKWebView(frame: frame, configuration: configuration)
+        _webView = WKWebView(frame: _containerView.bounds, configuration: configuration)
         
         super.init()
+        
+        // IMPORTANT: Set autoresizing mask to handle frame changes
+        _webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        _webView.translatesAutoresizingMaskIntoConstraints = true
+        
+        // Add webview to container
+        _containerView.addSubview(_webView)
         
         // Set delegates
         _webView.navigationDelegate = self
         
         // Enable scrolling
         _webView.scrollView.isScrollEnabled = true
+        _webView.scrollView.bounces = true
         
         // Set background color
-        _webView.isOpaque = false
+        _webView.isOpaque = true
         _webView.backgroundColor = UIColor.white
         
         // Allow magnification
-        _webView.allowsMagnification = false
+        _webView.allowsMagnification = true
+        
+        // Additional debugging
+        print("🔧 WKWebView initialized with frame: \(frame)")
+        print("🔧 Container bounds: \(_containerView.bounds)")
+        print("🔧 WKWebView bounds: \(_webView.bounds)")
+        print("🔧 Configuration: JavaScript=\(configuration.preferences.javaScriptEnabled)")
         
         // Add script message handlers for JS Bridge
         userContentController.add(self, name: "flutterEsimBridge")
@@ -85,25 +104,44 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         if let args = args as? [String: Any],
            let url = args["url"] as? String,
            let urlObj = URL(string: url) {
-            let request = URLRequest(url: urlObj)
+            print("🌐 Loading URL: \(url)")
+            var request = URLRequest(url: urlObj)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
             _webView.load(request)
+        } else {
+            print("⚠️ No URL provided in arguments")
         }
     }
     
     func view() -> UIView {
-        return _webView
+        return _containerView
     }
     
     // MARK: - WKNavigationDelegate
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         if let url = webView.url?.absoluteString {
+            print("📍 Page started: \(url)")
             methodChannel.invokeMethod("onPageStarted", arguments: url)
         }
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let url = webView.url?.absoluteString {
+            print("✅ Page finished: \(url)")
+            print("🔍 WebView frame: \(webView.frame)")
+            print("🔍 WebView isHidden: \(webView.isHidden)")
+            print("🔍 WebView alpha: \(webView.alpha)")
+            
+            // Check content size
+            webView.evaluateJavaScript("document.body.scrollHeight") { result, error in
+                if let height = result {
+                    print("📏 Content height: \(height)")
+                } else if let error = error {
+                    print("⚠️ Failed to get content height: \(error)")
+                }
+            }
+            
             // Inject JS Bridge after page loads
             injectJsBridge(webView: webView)
             methodChannel.invokeMethod("onPageFinished", arguments: url)
@@ -111,13 +149,28 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        print("❌ Navigation failed: \(error.localizedDescription)")
         let errorMessage = "Error: \(error.localizedDescription)"
         methodChannel.invokeMethod("onError", arguments: errorMessage)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        print("❌ Provisional navigation failed: \(error.localizedDescription)")
         let errorMessage = "Error: \(error.localizedDescription)"
         methodChannel.invokeMethod("onError", arguments: errorMessage)
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        print("🔗 Navigation action: \(navigationAction.request.url?.absoluteString ?? "unknown")")
+        decisionHandler(.allow)
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if let response = navigationResponse.response as? HTTPURLResponse {
+            print("📦 Response status: \(response.statusCode)")
+            print("📦 Content-Type: \(response.allHeaderFields["Content-Type"] ?? "unknown")")
+        }
+        decisionHandler(.allow)
     }
     
     // MARK: - WKScriptMessageHandler
