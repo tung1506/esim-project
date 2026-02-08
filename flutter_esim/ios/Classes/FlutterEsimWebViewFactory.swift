@@ -49,12 +49,34 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         let userContentController = WKUserContentController()
         configuration.userContentController = userContentController
         
+        // Enable JavaScript
+        configuration.preferences.javaScriptEnabled = true
+        
+        // Allow inline media playback
+        configuration.allowsInlineMediaPlayback = true
+        
+        // Allow picture in picture
+        configuration.allowsPictureInPictureMediaPlayback = true
+        
+        // Media types requiring user action
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        
         _webView = WKWebView(frame: frame, configuration: configuration)
         
         super.init()
         
         // Set delegates
         _webView.navigationDelegate = self
+        
+        // Enable scrolling
+        _webView.scrollView.isScrollEnabled = true
+        
+        // Set background color
+        _webView.isOpaque = false
+        _webView.backgroundColor = UIColor.white
+        
+        // Allow magnification
+        _webView.allowsMagnification = false
         
         // Add script message handlers for JS Bridge
         userContentController.add(self, name: "flutterEsimBridge")
