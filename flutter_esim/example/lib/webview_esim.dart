@@ -55,7 +55,7 @@ class _WebViewEsimPageState extends State<WebViewEsimPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('eSIM WebView', style: TextStyle(fontSize: 16)),
+            const Text('eSIM WebView v3', style: TextStyle(fontSize: 16)),
             if (_currentUrl.isNotEmpty)
               Text(
                 _currentUrl,

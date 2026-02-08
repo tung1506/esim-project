@@ -50,10 +50,36 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   void initState() {
     super.initState();
     _currentUrl = widget.initialUrl;
+
+    // Show something immediately on-screen so user can verify Dart side is alive.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addDebug('FlutterEsimWebView init: url=${widget.initialUrl}');
+      _addDebug('Platform: $defaultTargetPlatform');
+    });
+
+    // Capture Flutter framework errors to overlay (useful when device has no logs).
+    final oldOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      try {
+        _addDebug('FLUTTER_ERROR: ${details.exceptionAsString()}');
+      } catch (_) {
+        // ignore
+      }
+      oldOnError?.call(details);
+    };
+
     _setupMethodCallHandler();
   }
 
+  @override
+  void dispose() {
+    // Prevent late setState from async callbacks.
+    _channel.setMethodCallHandler(null);
+    super.dispose();
+  }
+
   void _addDebug(String message) {
+    if (!mounted) return;
     final ts = DateTime.now().toIso8601String().substring(11, 19);
     setState(() {
       _debugLines.add('[$ts] $message');
@@ -154,7 +180,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   }
 
   Future<void> _reload() async {
-    if (_viewId == null) return;
+    if (_viewId == null) {
+      _addDebug('Reload ignored: viewId is null');
+      return;
+    }
     try {
       await _channel.invokeMethod('reload', {'viewId': _viewId});
       _addDebug('Reload triggered');
@@ -164,7 +193,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   }
 
   Future<bool> _canGoBack() async {
-    if (_viewId == null) return false;
+    if (_viewId == null) {
+      _addDebug('canGoBack=false (viewId is null)');
+      return false;
+    }
     try {
       final result = await _channel.invokeMethod('canGoBack', {'viewId': _viewId});
       return result as bool? ?? false;
@@ -175,7 +207,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   }
 
   Future<void> _goBack() async {
-    if (_viewId == null) return;
+    if (_viewId == null) {
+      _addDebug('goBack ignored: viewId is null');
+      return;
+    }
     try {
       await _channel.invokeMethod('goBack', {'viewId': _viewId});
       _addDebug('Go back triggered');
@@ -185,10 +220,13 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   }
 
   Future<bool> _onWillPop() async {
-    if (await _canGoBack()) {
+    _addDebug('WillPopScope: onWillPop called');
+    final canBack = await _canGoBack();
+    if (canBack) {
       await _goBack();
       return false;
     }
+    _addDebug('WillPopScope: popping route');
     return true;
   }
 
@@ -304,29 +342,31 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
       'url': widget.initialUrl,
     };
 
-    // iOS uses UiKitView with Hybrid Composition
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
         viewType: 'com.flutter_esim/webview',
         creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
         onPlatformViewCreated: (int id) {
+          if (!mounted) return;
           setState(() => _viewId = id);
           widget.onWebViewCreated?.call();
-          _addDebug('iOS WebView created with ID: $id');
+          _addDebug('iOS UiKitView created with ID: $id');
+          _addDebug('Creation params: $creationParams');
         },
       );
     }
-    
-    // Android uses AndroidView
+
     return AndroidView(
       viewType: 'com.flutter_esim/webview',
       creationParams: creationParams,
       creationParamsCodec: const StandardMessageCodec(),
       onPlatformViewCreated: (int id) {
+        if (!mounted) return;
         setState(() => _viewId = id);
         widget.onWebViewCreated?.call();
-        _addDebug('Android WebView created with ID: $id');
+        _addDebug('AndroidView created with ID: $id');
+        _addDebug('Creation params: $creationParams');
       },
     );
   }

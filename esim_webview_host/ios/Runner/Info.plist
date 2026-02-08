@@ -54,5 +54,13 @@
 	</dict>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+
+	<!-- Local Network permission (iOS 14+) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs local network access for development/debugging features.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartobservatory._tcp</string>
+	</array>
 </dict>
 </plist>
