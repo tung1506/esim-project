@@ -63,11 +63,7 @@ workflows:
     name: Android Build (Test)
     max_build_duration: 60
     instance_type: mac_mini_m1
-    
-    environment:
-      vars:
-        # No Android signing needed for now
-      flutter: 3.24.5  # ← Same version
+   
       
     triggering:
       events:
