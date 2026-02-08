@@ -24,6 +24,8 @@ public class FlutterEsimPlugin: NSObject, FlutterPlugin {
     }
     
     public static func register(with registrar: FlutterPluginRegistrar) {
+        print("🔧 FlutterEsimPlugin: Registering plugin...")
+        
         let instance = FlutterEsimPlugin()
         instance.shareHandlers(with: registrar)
         
@@ -33,9 +35,15 @@ public class FlutterEsimPlugin: NSObject, FlutterPlugin {
             messenger: registrar.messenger(),
             methodChannel: methodChannel
         )
-        // Use Hybrid Composition mode for better compatibility
-        registrar.register(factory, withId: "com.flutter_esim/webview", 
-                          gestureRecognizersBlockingPolicy: FlutterPlatformViewGestureRecognizersBlockingPolicyEager)
+        
+        // CRITICAL: Use Hybrid Composition for iOS
+        // This is required for WKWebView to render properly in Flutter
+        registrar.register(
+            factory, 
+            withId: "com.flutter_esim/webview"
+        )
+        
+        print("✅ FlutterEsimPlugin: WebView factory registered with Hybrid Composition")
     }
     
     private func shareHandlers(with registrar: FlutterPluginRegistrar) {
