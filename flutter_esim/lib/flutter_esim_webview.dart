@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
-import 'package:flutter/gestures.dart';
 import 'flutter_esim.dart';
 
 /// A WebView widget that automatically integrates eSIM functionality
@@ -44,6 +43,9 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   String? _errorMessage;
   int? _viewId;
 
+  final List<String> _debugLines = <String>[];
+  bool _showDebugOverlay = true;
+
   @override
   void initState() {
     super.initState();
@@ -51,9 +53,23 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     _setupMethodCallHandler();
   }
 
+  void _addDebug(String message) {
+    final ts = DateTime.now().toIso8601String().substring(11, 19);
+    setState(() {
+      _debugLines.add('[$ts] $message');
+      if (_debugLines.length > 200) {
+        _debugLines.removeRange(0, _debugLines.length - 200);
+      }
+    });
+  }
+
   void _setupMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
+        case 'onLog':
+          final msg = (call.arguments as String?) ?? '';
+          _addDebug('NATIVE: $msg');
+          return null;
         case 'onPageStarted':
           final url = call.arguments as String;
           setState(() {
@@ -62,7 +78,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = null;
           });
           widget.onPageStarted?.call(url);
-          debugPrint('📄 Page started: $url');
+          _addDebug('Page started: $url');
           break;
           
         case 'onPageFinished':
@@ -72,7 +88,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _currentUrl = url;
           });
           widget.onPageFinished?.call(url);
-          debugPrint('✅ Page finished: $url');
+          _addDebug('Page finished: $url');
           break;
           
         case 'onError':
@@ -82,20 +98,20 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = error;
           });
           widget.onError?.call(error);
-          debugPrint('❌ Error: $error');
+          _addDebug('ERROR: $error');
           break;
           
         case 'isSupportESim':
-          debugPrint('🔍 JS Bridge called: isSupportESim');
+          _addDebug('JS Bridge called: isSupportESim');
           return await _handleIsSupportESim();
           
         case 'installEsimProfile':
           final activationCode = call.arguments as String?;
-          debugPrint('📲 JS Bridge called: installEsimProfile');
+          _addDebug('JS Bridge called: installEsimProfile');
           return await _handleInstallEsimProfile(activationCode);
           
         default:
-          debugPrint('⚠️ Unknown method: ${call.method}');
+          _addDebug('Unknown method: ${call.method}');
       }
       return null;
     });
@@ -104,10 +120,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   Future<String> _handleIsSupportESim() async {
     try {
       final isSupported = await _flutterEsim.isSupportESim(null);
-      debugPrint('✅ eSIM Support: $isSupported');
+      _addDebug('eSIM Support: $isSupported');
       return '{"success":true,"isSupported":$isSupported}';
     } catch (e) {
-      debugPrint('❌ Error checking eSIM support: $e');
+      _addDebug('Error checking eSIM support: $e');
       return '{"success":false,"error":"${e.toString()}","isSupported":false}';
     }
   }
@@ -118,13 +134,13 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     }
 
     try {
-      debugPrint('📲 Installing eSIM profile on platform...');
+      _addDebug('Installing eSIM profile on platform...');
       
       // Platform-specific logic
       // iOS: Open Universal Link in browser
       // Android: Install directly via CTCellularPlanProvisioning
       final result = await _flutterEsim.installEsimProfile(activationCode);
-      debugPrint('✅ Installation result: $result');
+      _addDebug('Installation result: $result');
       
       if (result) {
         return '{"success":true,"message":"eSIM installation initiated successfully"}';
@@ -132,7 +148,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         return '{"success":false,"error":"Failed to install eSIM profile"}';
       }
     } catch (e) {
-      debugPrint('❌ Error installing eSIM: $e');
+      _addDebug('Error installing eSIM: $e');
       return '{"success":false,"error":"${e.toString()}"}';
     }
   }
@@ -141,9 +157,9 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     if (_viewId == null) return;
     try {
       await _channel.invokeMethod('reload', {'viewId': _viewId});
-      debugPrint('🔄 Reload triggered');
+      _addDebug('Reload triggered');
     } catch (e) {
-      debugPrint('❌ Reload error: $e');
+      _addDebug('Reload error: $e');
     }
   }
 
@@ -153,7 +169,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
       final result = await _channel.invokeMethod('canGoBack', {'viewId': _viewId});
       return result as bool? ?? false;
     } catch (e) {
-      debugPrint('❌ CanGoBack error: $e');
+      _addDebug('CanGoBack error: $e');
       return false;
     }
   }
@@ -162,9 +178,9 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     if (_viewId == null) return;
     try {
       await _channel.invokeMethod('goBack', {'viewId': _viewId});
-      debugPrint('⬅️ Go back triggered');
+      _addDebug('Go back triggered');
     } catch (e) {
-      debugPrint('❌ GoBack error: $e');
+      _addDebug('GoBack error: $e');
     }
   }
 
@@ -184,6 +200,11 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         appBar: AppBar(
           title: const Text('eSIM WebView'),
           actions: [
+            IconButton(
+              icon: Icon(_showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined),
+              onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
+              tooltip: 'Toggle debug overlay',
+            ),
             if (_isLoading)
               const Center(
                 child: Padding(
@@ -255,7 +276,21 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             
             // WebView
             Expanded(
-              child: _buildPlatformView(),
+              child: Stack(
+                children: [
+                  _buildPlatformView(),
+                  if (_showDebugOverlay)
+                    Positioned(
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      child: _DebugOverlay(
+                        lines: _debugLines,
+                        onClear: () => setState(_debugLines.clear),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -278,10 +313,8 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         onPlatformViewCreated: (int id) {
           setState(() => _viewId = id);
           widget.onWebViewCreated?.call();
-          debugPrint('� iOS WebView created with ID: $id');
+          _addDebug('iOS WebView created with ID: $id');
         },
-        // Use Hybrid Composition for better compatibility
-        gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
       );
     }
     
@@ -293,8 +326,67 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
       onPlatformViewCreated: (int id) {
         setState(() => _viewId = id);
         widget.onWebViewCreated?.call();
-        debugPrint('🤖 Android WebView created with ID: $id');
+        _addDebug('Android WebView created with ID: $id');
       },
+    );
+  }
+}
+
+class _DebugOverlay extends StatelessWidget {
+  final List<String> lines;
+  final VoidCallback onClear;
+
+  const _DebugOverlay({
+    required this.lines,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        height: 180,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.75),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Debug',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onClear,
+                  child: const Text('Clear', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  lines.isEmpty ? 'No logs yet…' : lines.reversed.take(40).join('\n'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    height: 1.25,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

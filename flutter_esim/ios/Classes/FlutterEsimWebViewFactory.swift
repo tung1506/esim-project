@@ -36,6 +36,14 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     private var _containerView: UIView
     private var methodChannel: FlutterMethodChannel
     
+    private func logToFlutter(_ message: String) {
+        // Best-effort logging to Flutter; ignore failures
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.methodChannel.invokeMethod("onLog", arguments: message)
+        }
+    }
+    
     init(
         frame: CGRect,
         viewIdentifier viewId: Int64,
@@ -72,12 +80,18 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         
         super.init()
         
+        logToFlutter("iOS WebView init frame=\(frame)")
+        
+        print("🚀 FlutterEsimWebView initializing...")
+        print("🔧 Frame: width=\(frame.width), height=\(frame.height)")
+        
         // Use autoresizing mask instead of Auto Layout for Flutter Platform View
         _webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         _webView.translatesAutoresizingMaskIntoConstraints = true  // Changed to true
         
         // Add webview to container
         _containerView.addSubview(_webView)
+        print("✅ WebView added to container")
         
         // Set delegates
         _webView.navigationDelegate = self
@@ -85,12 +99,12 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         // Enable scrolling
         _webView.scrollView.isScrollEnabled = true
         _webView.scrollView.bounces = true
-        _webView.scrollView.backgroundColor = UIColor.red
+        _webView.scrollView.backgroundColor = UIColor.clear  // Changed from red
         
-        // Set background color to RED for debugging
-        _webView.isOpaque = false  // Changed to false to see through
-        _webView.backgroundColor = UIColor.red
-        _containerView.backgroundColor = UIColor.red
+        // Set background color
+        _webView.isOpaque = true
+        _webView.backgroundColor = UIColor.white
+        _containerView.backgroundColor = UIColor.white
         
         // Force layout
         _webView.setNeedsLayout()
@@ -100,18 +114,19 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         _webView.allowsMagnification = true
         
         // Additional debugging
-        print("🔧 WKWebView initialized with frame: \(frame)")
         print("🔧 Container bounds: \(_containerView.bounds)")
         print("🔧 WKWebView bounds: \(_webView.bounds)")
         print("🔧 Configuration: JavaScript=\(configuration.preferences.javaScriptEnabled)")
         
         // Add script message handlers for JS Bridge
         userContentController.add(self, name: "flutterEsimBridge")
+        print("✅ Script message handler registered")
         
         // Parse arguments and load URL
         if let args = args as? [String: Any],
            let url = args["url"] as? String,
            let urlObj = URL(string: url) {
+            logToFlutter("Loading URL: \(url)")
             print("🌐 Loading URL: \(url)")
             
             // Load URL after a short delay to ensure view is laid out
@@ -125,6 +140,7 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
                 self._containerView.setNeedsDisplay()
             }
         } else {
+            logToFlutter("No URL provided in arguments")
             print("⚠️ No URL provided in arguments")
         }
     }
@@ -136,47 +152,55 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     // MARK: - Cleanup
     
     deinit {
+        logToFlutter("deinit")
         print("🧹 FlutterEsimWebView deallocating...")
-        // Cleanup must be synchronous
-        cleanupSync()
+        // Cleanup on main thread to prevent crash
+        DispatchQueue.main.async { [weak self] in
+            self?.cleanupSync()
+        }
     }
     
     private func cleanupSync() {
+        logToFlutter("cleanupSync")
         // Stop loading first
         _webView.stopLoading()
         
         // Clear delegates
         _webView.navigationDelegate = nil
         
-        // Remove script message handlers - wrap in try-catch to prevent crash
-        do {
+        // Remove script message handlers safely
+        _webView.configuration.userContentController.removeAllUserScripts()
+        
+        // Important: Use removeAllScriptMessageHandlers on iOS 14+
+        if #available(iOS 14.0, *) {
+            _webView.configuration.userContentController.removeAllScriptMessageHandlers()
+        } else {
+            // Fallback for older iOS versions
+            // Note: This may cause a warning but won't crash
             _webView.configuration.userContentController.removeScriptMessageHandler(forName: "flutterEsimBridge")
-        } catch {
-            print("⚠️ Error removing script message handler: \(error)")
         }
         
         // Remove from superview
         _webView.removeFromSuperview()
         
-        print("✅ WebView cleaned up")
-    }
-    
-    private func cleanup() {
-        // Deprecated - use cleanupSync instead
-        cleanupSync()
+        print("✅ WebView cleaned up safely")
     }
     
     // MARK: - WKNavigationDelegate
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         if let url = webView.url?.absoluteString {
+            logToFlutter("didStart: \(url)")
             print("📍 Page started: \(url)")
             methodChannel.invokeMethod("onPageStarted", arguments: url)
+        } else {
+            logToFlutter("didStart (url=nil)")
         }
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if let url = webView.url?.absoluteString {
+            logToFlutter("didFinish: \(url) size=\(webView.frame.size)")
             print("✅ Page finished: \(url)")
             print("🔍 WebView frame: \(webView.frame)")
             print("🔍 Container frame: \(_containerView.frame)")
@@ -215,19 +239,23 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        logToFlutter("didFail: \(error.localizedDescription)")
         print("❌ Navigation failed: \(error.localizedDescription)")
         let errorMessage = "Error: \(error.localizedDescription)"
         methodChannel.invokeMethod("onError", arguments: errorMessage)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        logToFlutter("didFailProvisional: \(error.localizedDescription)")
         print("❌ Provisional navigation failed: \(error.localizedDescription)")
         let errorMessage = "Error: \(error.localizedDescription)"
         methodChannel.invokeMethod("onError", arguments: errorMessage)
     }
     
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        print("🔗 Navigation action: \(navigationAction.request.url?.absoluteString ?? "unknown")")
+        let u = navigationAction.request.url?.absoluteString ?? "unknown"
+        logToFlutter("navAction: \(u)")
+        print("🔗 Navigation action: \(u)")
         decisionHandler(.allow)
     }
     
