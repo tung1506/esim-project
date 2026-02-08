@@ -198,7 +198,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('eSIM WebView'),
+          title: const Text('eSIM WebView v2'),
           actions: [
             IconButton(
               icon: Icon(_showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined),
