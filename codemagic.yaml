@@ -1,71 +1,97 @@
-# Codemagic build configuration for esim_webview_host iOS app
 workflows:
   ios-workflow:
-    name: iOS Build and Deploy
-    max_build_duration: 60
+    name: iOS Build
+    max_build_duration: 120
     instance_type: mac_mini_m1
     
     environment:
-      # Flutter version
-      flutter: stable
-      
-      # Xcode version
-      xcode: latest
-      
-      # CocoaPods version
-      cocoapods: default
-      
-      # Environment variables
+      android_signing:
+        - keystore_reference
+      groups:
+        - app_store_credentials
       vars:
-        # Bundle ID - MUST MATCH Apple Developer Portal & Xcode project
+        XCODE_WORKSPACE: "esim_webview_host/ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.tung1506.esimwebviewhost"
         
-        # App name
-        APP_NAME: "eSIM WebView Host"
-        
-      # iOS code signing - Codemagic sẽ tự động manage
-      ios_signing:
-        distribution_type: ad_hoc  # Hoặc 'app_store' nếu muốn deploy lên TestFlight
-        bundle_identifier: $BUNDLE_ID
-        
-    # Scripts to run
+      # ✅ FIX: Specify exact Flutter version
+      flutter: 3.24.5  # ← Change from 'stable' to specific version
+      xcode: 15.4
+      cocoapods: default
+      
     scripts:
-      # 1. Get Flutter dependencies
-      - name: Get Flutter dependencies
+      - name: Get Flutter packages for flutter_esim
+        script: |
+          cd flutter_esim
+          flutter pub get
+          
+      - name: Get Flutter packages for esim_webview_host
         script: |
           cd esim_webview_host
           flutter pub get
           
-      # 2. Get iOS CocoaPods dependencies
-      - name: Install CocoaPods dependencies
+      - name: Set up code signing
+        script: |
+          cd esim_webview_host
+          xcode-project use-profiles
+          
+      - name: Install CocoaPods
         script: |
           cd esim_webview_host/ios
           pod install
           
-      # 3. Build iOS app
-      - name: Build iOS IPA
+      - name: Build IPA
         script: |
           cd esim_webview_host
-          flutter build ipa \
-            --release \
+          flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
             
-    # Artifacts to publish (IPA file)
     artifacts:
       - esim_webview_host/build/ios/ipa/*.ipa
-      - esim_webview_host/build/ios/archive/Runner.xcarchive/**/*.app
+      - /tmp/xcodebuild_logs/*.log
       
-    # Publishing options
     publishing:
-      # Email notification
       email:
         recipients:
-          - your.email@example.com  # THAY ĐỔI EMAIL CỦA BẠN
+          - your.email@example.com
         notify:
           success: true
           failure: true
           
-      # Slack notification (optional)
-      # slack:
-      #   channel: '#builds'
-      #   notify_on_build_start: true
+  # ✅ ADD: Android workflow for testing
+  android-workflow:
+    name: Android Build (Test)
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    
+    environment:
+      vars:
+        # No Android signing needed for now
+      flutter: 3.24.5  # ← Same version
+      
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+      
+    scripts:
+      - name: Get Flutter packages for flutter_esim
+        script: |
+          cd flutter_esim
+          flutter pub get
+          
+      - name: Get Flutter packages for esim_webview_host
+        script: |
+          cd esim_webview_host
+          flutter pub get
+          
+      - name: Build Android APK
+        script: |
+          cd esim_webview_host
+          flutter build apk --debug
+          
+    artifacts:
+      - esim_webview_host/build/app/outputs/flutter-apk/*.apk
