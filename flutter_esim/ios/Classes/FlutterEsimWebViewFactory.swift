@@ -47,7 +47,7 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         
         // Create container view
         _containerView = UIView(frame: frame)
-        _containerView.backgroundColor = UIColor.white
+        _containerView.backgroundColor = UIColor.red  // Changed to red for debugging
         
         // Configure WKWebView
         let configuration = WKWebViewConfiguration()
@@ -72,10 +72,18 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         
         // IMPORTANT: Set autoresizing mask to handle frame changes
         _webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        _webView.translatesAutoresizingMaskIntoConstraints = true
+        _webView.translatesAutoresizingMaskIntoConstraints = false  // Use Auto Layout
         
         // Add webview to container
         _containerView.addSubview(_webView)
+        
+        // Add constraints to fill container
+        NSLayoutConstraint.activate([
+            _webView.leadingAnchor.constraint(equalTo: _containerView.leadingAnchor),
+            _webView.trailingAnchor.constraint(equalTo: _containerView.trailingAnchor),
+            _webView.topAnchor.constraint(equalTo: _containerView.topAnchor),
+            _webView.bottomAnchor.constraint(equalTo: _containerView.bottomAnchor)
+        ])
         
         // Set delegates
         _webView.navigationDelegate = self
@@ -84,9 +92,10 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         _webView.scrollView.isScrollEnabled = true
         _webView.scrollView.bounces = true
         
-        // Set background color
+        // Set background color to RED for debugging
         _webView.isOpaque = true
-        _webView.backgroundColor = UIColor.white
+        _webView.backgroundColor = UIColor.red
+        _containerView.backgroundColor = UIColor.red
         
         // Allow magnification
         _webView.allowsMagnification = true
@@ -115,6 +124,29 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     
     func view() -> UIView {
         return _containerView
+    }
+    
+    // MARK: - Cleanup
+    
+    deinit {
+        print("🧹 FlutterEsimWebView deallocating...")
+        cleanup()
+    }
+    
+    private func cleanup() {
+        // Remove script message handlers
+        _webView.configuration.userContentController.removeScriptMessageHandler(forName: "flutterEsimBridge")
+        
+        // Clear navigation delegate
+        _webView.navigationDelegate = nil
+        
+        // Stop loading
+        _webView.stopLoading()
+        
+        // Remove from superview
+        _webView.removeFromSuperview()
+        
+        print("✅ WebView cleaned up")
     }
     
     // MARK: - WKNavigationDelegate
