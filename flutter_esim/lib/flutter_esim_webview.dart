@@ -37,7 +37,7 @@ class FlutterEsimWebView extends StatefulWidget {
 class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   static const _channel = MethodChannel('com.flutter_esim/webview');
   final _flutterEsim = FlutterEsim();
-  
+
   bool _isLoading = true;
   String _currentUrl = '';
   String? _errorMessage;
@@ -46,15 +46,20 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   final List<String> _debugLines = <String>[];
   bool _showDebugOverlay = true;
 
+  // Show important debug as an in-app notification banner.
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+  DateTime _lastSnackAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
     _currentUrl = widget.initialUrl;
 
-    // Show something immediately on-screen so user can verify Dart side is alive.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _addDebug('FlutterEsimWebView init: url=${widget.initialUrl}');
       _addDebug('Platform: $defaultTargetPlatform');
+      _notify('Init OK', details: widget.initialUrl);
     });
 
     // Capture Flutter framework errors to overlay (useful when device has no logs).
@@ -62,6 +67,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     FlutterError.onError = (FlutterErrorDetails details) {
       try {
         _addDebug('FLUTTER_ERROR: ${details.exceptionAsString()}');
+        _notify('FLUTTER_ERROR', details: details.exceptionAsString(), isError: true);
       } catch (_) {
         // ignore
       }
@@ -73,12 +79,39 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
 
   @override
   void dispose() {
-    // Prevent late setState from async callbacks.
     _channel.setMethodCallHandler(null);
     super.dispose();
   }
 
-  void _addDebug(String message) {
+  void _notify(String title, {String? details, bool isError = false}) {
+    if (!mounted) return;
+
+    // Throttle to avoid spamming.
+    final now = DateTime.now();
+    if (now.difference(_lastSnackAt).inMilliseconds < 800) return;
+    _lastSnackAt = now;
+
+    final messenger = _scaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+
+    final text = details == null ? title : '$title: $details';
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          backgroundColor: isError ? Colors.red.shade700 : Colors.blueGrey.shade800,
+          content: Text(
+            text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+  }
+
+  void _addDebug(String message, {bool popup = false, bool isError = false}) {
     if (!mounted) return;
     final ts = DateTime.now().toIso8601String().substring(11, 19);
     setState(() {
@@ -87,6 +120,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         _debugLines.removeRange(0, _debugLines.length - 200);
       }
     });
+
+    if (popup) {
+      _notify('Debug', details: message, isError: isError);
+    }
   }
 
   void _setupMethodCallHandler() {
@@ -95,7 +132,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         case 'onLog':
           final msg = (call.arguments as String?) ?? '';
           _addDebug('NATIVE: $msg');
+          // Pop up native logs because user can't read device logs.
+          _addDebug('NATIVE: $msg', popup: true);
           return null;
+
         case 'onPageStarted':
           final url = call.arguments as String;
           setState(() {
@@ -104,9 +144,9 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = null;
           });
           widget.onPageStarted?.call(url);
-          _addDebug('Page started: $url');
+          _addDebug('Page started: $url', popup: true);
           break;
-          
+
         case 'onPageFinished':
           final url = call.arguments as String;
           setState(() {
@@ -114,9 +154,9 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _currentUrl = url;
           });
           widget.onPageFinished?.call(url);
-          _addDebug('Page finished: $url');
+          _addDebug('Page finished: $url', popup: true);
           break;
-          
+
         case 'onError':
           final error = call.arguments as String;
           setState(() {
@@ -124,20 +164,20 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = error;
           });
           widget.onError?.call(error);
-          _addDebug('ERROR: $error');
+          _addDebug('ERROR: $error', popup: true, isError: true);
           break;
-          
+
         case 'isSupportESim':
-          _addDebug('JS Bridge called: isSupportESim');
+          _addDebug('JS Bridge called: isSupportESim', popup: true);
           return await _handleIsSupportESim();
-          
+
         case 'installEsimProfile':
           final activationCode = call.arguments as String?;
-          _addDebug('JS Bridge called: installEsimProfile');
+          _addDebug('JS Bridge called: installEsimProfile', popup: true);
           return await _handleInstallEsimProfile(activationCode);
-          
+
         default:
-          _addDebug('Unknown method: ${call.method}');
+          _addDebug('Unknown method: ${call.method}', popup: true);
       }
       return null;
     });
@@ -232,105 +272,108 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('eSIM WebView v2'),
-          actions: [
-            IconButton(
-              icon: Icon(_showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined),
-              onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
-              tooltip: 'Toggle debug overlay',
-            ),
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+    return ScaffoldMessenger(
+      key: _scaffoldMessengerKey,
+      child: WillPopScope(
+        onWillPop: _onWillPop,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('eSIM WebView v2'),
+            actions: [
+              IconButton(
+                icon: Icon(_showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined),
+                onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
+                tooltip: 'Toggle debug overlay',
+              ),
+              if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _reload,
+                tooltip: 'Reload',
               ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _reload,
-              tooltip: 'Reload',
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // URL bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.grey[200],
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _currentUrl,
-                      style: const TextStyle(fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Error message
-            if (_errorMessage != null)
+            ],
+          ),
+          body: Column(
+            children: [
+              // URL bar
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                color: Colors.red[100],
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Colors.grey[200],
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red),
+                    const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
+                        _currentUrl,
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => setState(() => _errorMessage = null),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
               ),
-            
-            // WebView
-            Expanded(
-              child: Stack(
-                children: [
-                  _buildPlatformView(),
-                  if (_showDebugOverlay)
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: _DebugOverlay(
-                        lines: _debugLines,
-                        onClear: () => setState(_debugLines.clear),
+              
+              // Error message
+              if (_errorMessage != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.red[100],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
-                    ),
-                ],
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => setState(() => _errorMessage = null),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              // WebView
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildPlatformView(),
+                    if (_showDebugOverlay)
+                      Positioned(
+                        left: 8,
+                        right: 8,
+                        bottom: 8,
+                        child: _DebugOverlay(
+                          lines: _debugLines,
+                          onClear: () => setState(_debugLines.clear),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
