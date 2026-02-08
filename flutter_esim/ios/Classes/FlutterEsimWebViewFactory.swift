@@ -137,23 +137,33 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     
     deinit {
         print("🧹 FlutterEsimWebView deallocating...")
-        cleanup()
+        // Cleanup must be synchronous
+        cleanupSync()
     }
     
-    private func cleanup() {
-        // Remove script message handlers
-        _webView.configuration.userContentController.removeScriptMessageHandler(forName: "flutterEsimBridge")
+    private func cleanupSync() {
+        // Stop loading first
+        _webView.stopLoading()
         
-        // Clear navigation delegate
+        // Clear delegates
         _webView.navigationDelegate = nil
         
-        // Stop loading
-        _webView.stopLoading()
+        // Remove script message handlers - wrap in try-catch to prevent crash
+        do {
+            _webView.configuration.userContentController.removeScriptMessageHandler(forName: "flutterEsimBridge")
+        } catch {
+            print("⚠️ Error removing script message handler: \(error)")
+        }
         
         // Remove from superview
         _webView.removeFromSuperview()
         
         print("✅ WebView cleaned up")
+    }
+    
+    private func cleanup() {
+        // Deprecated - use cleanupSync instead
+        cleanupSync()
     }
     
     // MARK: - WKNavigationDelegate

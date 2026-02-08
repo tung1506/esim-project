@@ -27,13 +27,15 @@ public class FlutterEsimPlugin: NSObject, FlutterPlugin {
         let instance = FlutterEsimPlugin()
         instance.shareHandlers(with: registrar)
         
-        // Register WebView Factory for iOS
+        // Register WebView Factory for iOS with Hybrid Composition
         let methodChannel = createMethodChannel(messenger: registrar.messenger())
         let factory = FlutterEsimWebViewFactory(
             messenger: registrar.messenger(),
             methodChannel: methodChannel
         )
-        registrar.register(factory, withId: "com.flutter_esim/webview")
+        // Use Hybrid Composition mode for better compatibility
+        registrar.register(factory, withId: "com.flutter_esim/webview", 
+                          gestureRecognizersBlockingPolicy: FlutterPlatformViewGestureRecognizersBlockingPolicyEager)
     }
     
     private func shareHandlers(with registrar: FlutterPluginRegistrar) {

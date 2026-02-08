@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/gestures.dart';
 import 'flutter_esim.dart';
 
 /// A WebView widget that automatically integrates eSIM functionality
@@ -253,22 +255,46 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             
             // WebView
             Expanded(
-              child: AndroidView(
-                viewType: 'com.flutter_esim/webview',
-                creationParams: {
-                  'url': widget.initialUrl,
-                },
-                creationParamsCodec: const StandardMessageCodec(),
-                onPlatformViewCreated: (int id) {
-                  setState(() => _viewId = id);
-                  widget.onWebViewCreated?.call();
-                  debugPrint('🌐 WebView created with ID: $id');
-                },
-              ),
+              child: _buildPlatformView(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // Build platform-specific view
+  Widget _buildPlatformView() {
+    final creationParams = {
+      'url': widget.initialUrl,
+    };
+
+    // iOS uses UiKitView with Hybrid Composition
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return UiKitView(
+        viewType: 'com.flutter_esim/webview',
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: (int id) {
+          setState(() => _viewId = id);
+          widget.onWebViewCreated?.call();
+          debugPrint('� iOS WebView created with ID: $id');
+        },
+        // Use Hybrid Composition for better compatibility
+        gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+      );
+    }
+    
+    // Android uses AndroidView
+    return AndroidView(
+      viewType: 'com.flutter_esim/webview',
+      creationParams: creationParams,
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: (int id) {
+        setState(() => _viewId = id);
+        widget.onWebViewCreated?.call();
+        debugPrint('🤖 Android WebView created with ID: $id');
+      },
     );
   }
 }
