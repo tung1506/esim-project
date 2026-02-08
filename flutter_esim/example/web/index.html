@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="example">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>eSIM Installer - Web</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    #loading {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      font-size: 18px;
+      font-weight: 500;
+    }
+  </style>
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    const serviceWorkerVersion = null;
+  </script>
+
+  <!-- Mock EsimNativeBridge for testing -->
+  <script>
+    console.log('Initializing eSIM Web Interface...');
+    
+    // Mock bridge for testing without native integration
+    if (typeof window.EsimNativeBridge === 'undefined') {
+      window.EsimNativeBridge = {
+        installEsim: function(activationCode, onSuccess, onError) {
+          console.log('🔧 MOCK: installEsim called with code:', activationCode.substring(0, 20) + '...');
+          console.warn('⚠️  Native bridge not available - using mock implementation');
+          console.log('📱 To enable real eSIM installation:');
+          console.log('   1. Load this page in a native Android WebView');
+          console.log('   2. Implement EsimBridgeActivity with JavaScript bridge');
+          console.log('   3. See integration guide in the app');
+          
+          setTimeout(() => {
+            onError('Native bridge not implemented. Please integrate EsimBridgeActivity into your Android app. See console for details.');
+          }, 1000);
+        },
+        
+        isEsimSupported: function(callback) {
+          console.log('🔧 MOCK: isEsimSupported called');
+          console.warn('⚠️  Native bridge not available - returning false');
+          setTimeout(() => callback(false), 500);
+        },
+        
+        getEsimInfo: function(callback) {
+          console.log('🔧 MOCK: getEsimInfo called');
+          console.warn('⚠️  Native bridge not available - returning mock data');
+          setTimeout(() => {
+            callback(JSON.stringify({
+              eid: 'MOCK_EID_' + Math.random().toString(36).substring(2, 15),
+              enabled: false,
+              error: 'Native bridge not available - this is mock data'
+            }));
+          }, 500);
+        }
+      };
+      
+      console.log('✅ Mock EsimNativeBridge initialized');
+      console.log('📖 Bridge methods available:', Object.keys(window.EsimNativeBridge));
+    } else {
+      console.log('✅ Native EsimNativeBridge detected');
+    }
+  </script>
+
+  <!-- This script adds the flutter initialization JS code -->
+  <script src="flutter.js" defer></script>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading eSIM Installer...</div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function(ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            // Hide loading screen
+            document.getElementById('loading').style.display = 'none';
+            appRunner.runApp();
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

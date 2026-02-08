@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eSIM Purchase - Powered by Flutter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 24px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 24px;
+        }
+        
+        .section {
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .badge.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .badge.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        textarea, input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.2s;
+        }
+        
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #bdbdbd;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .result.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 2px solid #a5d6a7;
+        }
+        
+        .result.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 2px solid #ef9a9a;
+        }
+        
+        .result.info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 2px solid #90caf9;
+        }
+        
+        #log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+        
+        .log-empty {
+            color: #888;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .button-group button {
+            flex: 1;
+        }
+        
+        .secondary-button {
+            background: #757575;
+        }
+        
+        .secondary-button:hover {
+            box-shadow: 0 6px 20px rgba(117, 117, 117, 0.4);
+        }
+        
+        .icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            padding: 20px;
+            text-align: center;
+            color: #757575;
+            font-size: 12px;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 eSIM Purchase</h1>
+            <p>Purchase and install eSIM profiles directly from your browser</p>
+        </div>
+        
+        <div class="content">
+            <!-- Support Check Section -->
+            <div class="section">
+                <div class="section-title">
+                    📱 Device Compatibility
+                </div>
+                <button onclick="checkSupport()" id="checkBtn">
+                    <span id="checkIcon">🔍</span>
+                    Check eSIM Support
+                </button>
+                <div id="supportResult"></div>
+            </div>
+            
+            <!-- eSIM Installation Section -->
+            <div class="section">
+                <div class="section-title">
+                    📥 Install eSIM Profile
+                </div>
+                <label for="activationCode">
+                    Activation Code
+                    <span style="color: #999; font-weight: normal; font-size: 12px;">
+                        (Format: LPA:1$sm-dp+.com$code)
+                    </span>
+                </label>
+                <textarea 
+                    id="activationCode" 
+                    placeholder="LPA:1$sm-dp+.example.com$activation-code-here"
+                ></textarea>
+                <button onclick="installEsim()" id="installBtn" style="margin-top: 12px;">
+                    <span id="installIcon">📥</span>
+                    Install eSIM
+                </button>
+                <div id="installResult"></div>
+            </div>
+            
+            <!-- Event Logs Section -->
+            <div class="section">
+                <div class="section-title">
+                    📋 Event Logs
+                </div>
+                <div id="log" class="log-empty">Waiting for events...</div>
+                <div class="button-group" style="margin-top: 12px;">
+                    <button onclick="clearLog()" class="secondary-button">
+                        🗑️ Clear Logs
+                    </button>
+                    <button onclick="copyLogs()" class="secondary-button">
+                        📋 Copy Logs
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Powered by Flutter eSIM Plugin | JS Bridge Active
+            <div id="platformInfo" style="margin-top: 8px; font-weight: 600;"></div>
+        </div>
+    </div>
+
+    <script>
+        let logCount = 0;
+        let detectedPlatform = 'Unknown';
+        
+        // Detect platform from User Agent
+        function detectPlatform() {
+            const ua = navigator.userAgent;
+            if (/iPhone|iPad|iPod/i.test(ua)) {
+                return 'iOS';
+            } else if (/Android/i.test(ua)) {
+                return 'Android';
+            } else if (/Macintosh|Mac OS X/i.test(ua)) {
+                return 'iOS'; // Might be iPad in desktop mode
+            }
+            return 'Unknown';
+        }
+        
+        // Update platform info in footer
+        function updatePlatformInfo(platform, method) {
+            const platformInfo = document.getElementById('platformInfo');
+            const icon = platform === 'iOS' ? '🍎' : platform === 'Android' ? '🤖' : '❓';
+            platformInfo.innerHTML = `${icon} Platform: <span style="color: #667eea">${platform}</span> | Method: <span style="color: #764ba2">${method}</span>`;
+        }
+        
+        // Log function with color coding
+        function log(message, level = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toISOString();
+            
+            if (logDiv.classList.contains('log-empty')) {
+                logDiv.classList.remove('log-empty');
+                logDiv.textContent = '';
+            }
+            
+            const colors = {
+                info: '#64b5f6',
+                success: '#81c784',
+                error: '#e57373',
+                event: '#ffd54f'
+            };
+            
+            const icons = {
+                info: 'ℹ️',
+                success: '✅',
+                error: '❌',
+                event: '📱'
+            };
+            
+            const color = colors[level] || colors.info;
+            const icon = icons[level] || icons.info;
+            
+            logDiv.innerHTML += `<span style="color: ${color}">${icon} [${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            logCount++;
+        }
+        
+        // Callback to receive events from Flutter
+        window.onEsimEvent = function(event) {
+            log('Flutter Event: ' + JSON.stringify(event), 'event');
+        };
+        
+        // Bridge wrapper to handle both sync and async patterns
+        function getBridge() {
+            // Check for FlutterEsimBridgeHelper first (injected by webview_page.dart)
+            if (typeof FlutterEsimBridgeHelper !== 'undefined') {
+                return FlutterEsimBridgeHelper;
+            }
+            // Then check for FlutterEsimBridge
+            if (typeof FlutterEsimBridge !== 'undefined') {
+                return FlutterEsimBridge;
+            }
+            throw new Error('FlutterEsimBridge not available. Make sure you are running in Flutter WebView with JS Bridge injected.');
+        }
+        
+        // Check eSIM support
+        async function checkSupport() {
+            const btn = document.getElementById('checkBtn');
+            const icon = document.getElementById('checkIcon');
+            
+            btn.disabled = true;
+            icon.innerHTML = '<div class="spinner"></div>';
+            
+            log('Checking eSIM support...', 'info');
+            
+            try {
+                const bridge = getBridge();
+                const result = await bridge.isSupportESim();
+                
+                log('Raw result: ' + JSON.stringify(result), 'info');
+                
+                const resultDiv = document.getElementById('supportResult');
+                
+                if (result.success) {
+                    if (result.supported) {
+                        resultDiv.innerHTML = `
+                            <div class="result success">
+                                ✅ Great! Your device supports eSIM
+                            </div>
+                        `;
+                        log('✅ Device supports eSIM', 'success');
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="result error">
+                                ❌ Sorry, your device does NOT support eSIM
+                            </div>
+                        `;
+                        log('❌ Device does NOT support eSIM', 'error');
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ Error: ${result.error}
+                        </div>
+                    `;
+                    log('❌ Error checking support: ' + result.error, 'error');
+                }
+            } catch (e) {
+                log('❌ Exception: ' + e.message, 'error');
+                document.getElementById('supportResult').innerHTML = 
+                    `<div class="result error">❌ Exception: ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                icon.textContent = '🔍';
+            }
+        }
+        
+        // Install eSIM
+        async function installEsim() {
+            const code = document.getElementById('activationCode').value.trim();
+            
+            if (!code) {
+                alert('⚠️ Please enter activation code');
+                return;
+            }
+            
+            const btn = document.getElementById('installBtn');
+            const icon = document.getElementById('installIcon');
+            
+            btn.disabled = true;
+            icon.innerHTML = '<div class="spinner"></div>';
+            
+            log('Installing eSIM with code: ' + code.substring(0, 30) + '...', 'info');
+            
+            try {
+                const bridge = getBridge();
+                const result = await bridge.installEsimProfile(code);
+                
+                log('Raw result: ' + JSON.stringify(result), 'info');
+                
+                const resultDiv = document.getElementById('installResult');
+                
+                if (result.success) {
+                    const installMethodMsg = detectedPlatform === 'iOS' ? 
+                        '<br><small style="font-size: 12px;">🍎 <strong>iOS:</strong> Safari/Chrome will open. Please complete installation and return to app.</small>' :
+                        '<br><small style="font-size: 12px;">🤖 <strong>Android:</strong> Follow the system prompts to complete installation.</small>';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            ✅ ${result.message}
+                            ${installMethodMsg}
+                        </div>
+                    `;
+                    log('✅ ' + result.message, 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ Error: ${result.error}
+                        </div>
+                    `;
+                    log('❌ Installation error: ' + result.error, 'error');
+                }
+            } catch (e) {
+                log('❌ Exception: ' + e.message, 'error');
+                document.getElementById('installResult').innerHTML = 
+                    `<div class="result error">❌ Exception: ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                icon.textContent = '📥';
+            }
+        }
+        
+        function clearLog() {
+            const logDiv = document.getElementById('log');
+            logDiv.classList.add('log-empty');
+            logDiv.textContent = 'Logs cleared.';
+            logCount = 0;
+            log('Logs cleared', 'info');
+        }
+        
+        function copyLogs() {
+            const logDiv = document.getElementById('log');
+            const text = logDiv.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Logs copied to clipboard!');
+                log('Logs copied to clipboard', 'success');
+            }).catch(err => {
+                alert('❌ Failed to copy logs: ' + err);
+                log('Failed to copy logs: ' + err, 'error');
+            });
+        }
+        
+        // Initial log
+        window.addEventListener('DOMContentLoaded', () => {
+            // Detect platform
+            detectedPlatform = detectPlatform();
+            log('🔍 Detected platform: ' + detectedPlatform, 'info');
+            log('User Agent: ' + navigator.userAgent.substring(0, 100) + '...', 'info');
+            
+            log('✅ Page loaded successfully', 'success');
+            log('FlutterEsimBridge available: ' + (typeof FlutterEsimBridge !== 'undefined'), 'info');
+            log('FlutterEsimBridgeHelper available: ' + (typeof FlutterEsimBridgeHelper !== 'undefined'), 'info');
+            
+            // Wait for bridge to be injected
+            let checkCount = 0;
+            const checkBridge = setInterval(() => {
+                checkCount++;
+                if (typeof FlutterEsimBridge !== 'undefined' || typeof FlutterEsimBridgeHelper !== 'undefined') {
+                    clearInterval(checkBridge);
+                    
+                    // Determine installation method based on platform
+                    const installMethod = detectedPlatform === 'iOS' ? 'Universal Link' : 
+                                        detectedPlatform === 'Android' ? 'Direct Installation' : 
+                                        'Unknown';
+                    
+                    updatePlatformInfo(detectedPlatform, installMethod);
+                    log('✅ Bridge detected for ' + detectedPlatform + ' (' + installMethod + ')', 'success');
+                    log('✅ Bridge detected, auto-checking eSIM support...', 'info');
+                    setTimeout(checkSupport, 500);
+                } else if (checkCount > 20) {
+                    clearInterval(checkBridge);
+                    log('⚠️ Bridge not detected after 2 seconds', 'error');
+                }
+            }, 100);
+        });
+        
+        // Listen for bridge ready event
+        window.addEventListener('flutterEsimBridgeReady', () => {
+            log('✅ flutterEsimBridgeReady event received', 'success');
+        });
+    </script>
+</body>
+</html>
