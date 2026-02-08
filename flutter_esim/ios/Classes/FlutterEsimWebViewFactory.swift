@@ -45,9 +45,10 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
     ) {
         self.methodChannel = methodChannel
         
-        // Create container view
+        // Create container view with explicit size
         _containerView = UIView(frame: frame)
-        _containerView.backgroundColor = UIColor.red  // Changed to red for debugging
+        _containerView.backgroundColor = UIColor.red
+        _containerView.clipsToBounds = true
         
         // Configure WKWebView
         let configuration = WKWebViewConfiguration()
@@ -66,24 +67,17 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         // Media types requiring user action
         configuration.mediaTypesRequiringUserActionForPlayback = []
         
-        _webView = WKWebView(frame: _containerView.bounds, configuration: configuration)
+        // Create webview with container's bounds
+        _webView = WKWebView(frame: CGRect(x: 0, y: 0, width: frame.width, height: frame.height), configuration: configuration)
         
         super.init()
         
-        // IMPORTANT: Set autoresizing mask to handle frame changes
+        // Use autoresizing mask instead of Auto Layout for Flutter Platform View
         _webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        _webView.translatesAutoresizingMaskIntoConstraints = false  // Use Auto Layout
+        _webView.translatesAutoresizingMaskIntoConstraints = true  // Changed to true
         
         // Add webview to container
         _containerView.addSubview(_webView)
-        
-        // Add constraints to fill container
-        NSLayoutConstraint.activate([
-            _webView.leadingAnchor.constraint(equalTo: _containerView.leadingAnchor),
-            _webView.trailingAnchor.constraint(equalTo: _containerView.trailingAnchor),
-            _webView.topAnchor.constraint(equalTo: _containerView.topAnchor),
-            _webView.bottomAnchor.constraint(equalTo: _containerView.bottomAnchor)
-        ])
         
         // Set delegates
         _webView.navigationDelegate = self
@@ -91,11 +85,16 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         // Enable scrolling
         _webView.scrollView.isScrollEnabled = true
         _webView.scrollView.bounces = true
+        _webView.scrollView.backgroundColor = UIColor.red
         
         // Set background color to RED for debugging
-        _webView.isOpaque = true
+        _webView.isOpaque = false  // Changed to false to see through
         _webView.backgroundColor = UIColor.red
         _containerView.backgroundColor = UIColor.red
+        
+        // Force layout
+        _webView.setNeedsLayout()
+        _webView.layoutIfNeeded()
         
         // Allow magnification
         _webView.allowsMagnification = true
@@ -114,9 +113,17 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
            let url = args["url"] as? String,
            let urlObj = URL(string: url) {
             print("🌐 Loading URL: \(url)")
-            var request = URLRequest(url: urlObj)
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            _webView.load(request)
+            
+            // Load URL after a short delay to ensure view is laid out
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                var request = URLRequest(url: urlObj)
+                request.cachePolicy = .reloadIgnoringLocalCacheData
+                self._webView.load(request)
+                
+                // Force redraw
+                self._webView.setNeedsDisplay()
+                self._containerView.setNeedsDisplay()
+            }
         } else {
             print("⚠️ No URL provided in arguments")
         }
@@ -162,8 +169,16 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         if let url = webView.url?.absoluteString {
             print("✅ Page finished: \(url)")
             print("🔍 WebView frame: \(webView.frame)")
+            print("🔍 Container frame: \(_containerView.frame)")
             print("🔍 WebView isHidden: \(webView.isHidden)")
             print("🔍 WebView alpha: \(webView.alpha)")
+            print("🔍 WebView superview: \(String(describing: webView.superview))")
+            print("🔍 Container superview: \(String(describing: _containerView.superview))")
+            
+            // Check if view is actually visible
+            if webView.frame.size.width == 0 || webView.frame.size.height == 0 {
+                print("⚠️ WebView has zero size!")
+            }
             
             // Check content size
             webView.evaluateJavaScript("document.body.scrollHeight") { result, error in
@@ -171,6 +186,15 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
                     print("📏 Content height: \(height)")
                 } else if let error = error {
                     print("⚠️ Failed to get content height: \(error)")
+                }
+            }
+            
+            // Check if HTML is loaded
+            webView.evaluateJavaScript("document.body.innerHTML.length") { result, error in
+                if let length = result {
+                    print("📄 HTML content length: \(length)")
+                } else if let error = error {
+                    print("⚠️ Failed to get HTML length: \(error)")
                 }
             }
             
