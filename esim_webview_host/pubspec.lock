@@ -65,9 +65,11 @@ packages:
   flutter_esim:
     dependency: "direct main"
     description:
-      path: "../flutter_esim"
-      relative: true
-    source: path
+      path: flutter_esim
+      ref: master
+      resolved-ref: "1bd04b32818e68d2540709a39ca9f7642c860665"
+      url: "https://github.com/tung1506/esim-project.git"
+    source: git
     version: "0.0.4"
   flutter_lints:
     dependency: "direct dev"

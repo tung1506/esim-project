@@ -38,7 +38,10 @@ dependencies:
   # Import flutter_esim SDK from local path (for CI/CD)
   # For Codemagic: use relative path since both are in same repo
   flutter_esim:
-    path: ../flutter_esim
+    git:
+      url: https://github.com/tung1506/esim-project.git
+      path: flutter_esim
+      ref: master
     
   # Alternative: If flutter_esim is published to pub.dev
   # flutter_esim: ^1.0.0

@@ -1,0 +1,71 @@
+# Codemagic build configuration for esim_webview_host iOS app
+workflows:
+  ios-workflow:
+    name: iOS Build and Deploy
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    
+    environment:
+      # Flutter version
+      flutter: stable
+      
+      # Xcode version
+      xcode: latest
+      
+      # CocoaPods version
+      cocoapods: default
+      
+      # Environment variables
+      vars:
+        # Bundle ID - MUST MATCH Apple Developer Portal & Xcode project
+        BUNDLE_ID: "com.tung1506.esimwebviewhost"
+        
+        # App name
+        APP_NAME: "eSIM WebView Host"
+        
+      # iOS code signing - Codemagic sẽ tự động manage
+      ios_signing:
+        distribution_type: ad_hoc  # Hoặc 'app_store' nếu muốn deploy lên TestFlight
+        bundle_identifier: $BUNDLE_ID
+        
+    # Scripts to run
+    scripts:
+      # 1. Get Flutter dependencies
+      - name: Get Flutter dependencies
+        script: |
+          cd esim_webview_host
+          flutter pub get
+          
+      # 2. Get iOS CocoaPods dependencies
+      - name: Install CocoaPods dependencies
+        script: |
+          cd esim_webview_host/ios
+          pod install
+          
+      # 3. Build iOS app
+      - name: Build iOS IPA
+        script: |
+          cd esim_webview_host
+          flutter build ipa \
+            --release \
+            --export-options-plist=/Users/builder/export_options.plist
+            
+    # Artifacts to publish (IPA file)
+    artifacts:
+      - esim_webview_host/build/ios/ipa/*.ipa
+      - esim_webview_host/build/ios/archive/Runner.xcarchive/**/*.app
+      
+    # Publishing options
+    publishing:
+      # Email notification
+      email:
+        recipients:
+          - your.email@example.com  # THAY ĐỔI EMAIL CỦA BẠN
+        notify:
+          success: true
+          failure: true
+          
+      # Slack notification (optional)
+      # slack:
+      #   channel: '#builds'
+      #   notify_on_build_start: true
