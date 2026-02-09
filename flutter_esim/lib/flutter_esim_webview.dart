@@ -3,19 +3,31 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'flutter_esim.dart';
 
-/// A WebView widget that automatically integrates eSIM functionality
-/// via JavaScript bridge for remote web pages.
+/// A production-ready WebView widget with eSIM functionality via JavaScript bridge.
+/// 
+/// This widget provides a clean API for displaying web content with eSIM integration.
+/// The host application should provide its own AppBar and navigation structure.
+/// 
+/// Example:
+/// ```dart
+/// FlutterEsimWebView(
+///   initialUrl: 'https://example.com',
+///   debugEnabled: true,
+///   onWebViewCreated: () => print('WebView ready'),
+///   onWebViewClosed: () => print('WebView closed'),
+///   onError: (error) => print('Error: $error'),
+/// )
+/// ```
 class FlutterEsimWebView extends StatefulWidget {
-  /// The initial URL to load in the WebView
+  /// The initial URL to load in the WebView (required)
   final String initialUrl;
 
-  /// Optional title to show in the built-in AppBar.
-  /// If null, a default title is used.
-  final String? title;
+  /// Optional cookies to inject into the WebView session
+  /// Format: Map of cookie name to cookie value
+  final Map<String, String>? initialCookies;
 
-  /// Whether this widget should render its own `Scaffold` + `AppBar`.
-  /// Set to false if the host app wants to provide its own AppBar.
-  final bool showAppBar;
+  /// Optional HTTP headers to add to the initial request
+  final Map<String, String>? initialHeaders;
   
   /// Optional callback when page starts loading
   final ValueChanged<String>? onPageStarted;
@@ -23,21 +35,31 @@ class FlutterEsimWebView extends StatefulWidget {
   /// Optional callback when page finishes loading
   final ValueChanged<String>? onPageFinished;
   
-  /// Optional callback when an error occurs
-  final ValueChanged<String>? onError;
-  
-  /// Optional callback when WebView is created
+  /// Optional callback when WebView is created and ready
   final VoidCallback? onWebViewCreated;
+
+  /// Optional callback when WebView is closed/disposed
+  final VoidCallback? onWebViewClosed;
+  
+  /// Optional callback when an error occurs
+  /// Receives error message with details
+  final ValueChanged<String>? onError;
+
+  /// Enable debug overlay for development (defaults to false)
+  /// When enabled, shows a debug console at the bottom of the WebView
+  final bool debugEnabled;
 
   const FlutterEsimWebView({
     super.key,
     required this.initialUrl,
-    this.title,
-    this.showAppBar = true,
+    this.initialCookies,
+    this.initialHeaders,
+    this.debugEnabled = false,
     this.onPageStarted,
     this.onPageFinished,
-    this.onError,
     this.onWebViewCreated,
+    this.onWebViewClosed,
+    this.onError,
   });
 
   @override
@@ -54,12 +76,6 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   int? _viewId;
 
   final List<String> _debugLines = <String>[];
-  bool _showDebugOverlay = true;
-
-  // Show important debug as an in-app notification banner.
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
-      GlobalKey<ScaffoldMessengerState>();
-  DateTime _lastSnackAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -67,26 +83,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     _currentUrl = widget.initialUrl;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _addDebug('FlutterEsimWebView init: url=${widget.initialUrl}');
-      _addDebug('Platform: $defaultTargetPlatform');
-
-      // Fingerprint: helps confirm the built artifact is running the expected code.
-      _addDebug('FINGERPRINT: FlutterEsimWebView_v2', popup: true);
-
-      _notify('Init OK', details: widget.initialUrl);
+      _logDebug('WebView initializing: ${widget.initialUrl}');
+      _logDebug('Platform: $defaultTargetPlatform');
+      _logDebug('Debug mode: ${widget.debugEnabled}');
     });
-
-    // Capture Flutter framework errors to overlay (useful when device has no logs).
-    final oldOnError = FlutterError.onError;
-    FlutterError.onError = (FlutterErrorDetails details) {
-      try {
-        _addDebug('FLUTTER_ERROR: ${details.exceptionAsString()}');
-        _notify('FLUTTER_ERROR', details: details.exceptionAsString(), isError: true);
-      } catch (_) {
-        // ignore
-      }
-      oldOnError?.call(details);
-    };
 
     _setupMethodCallHandler();
   }
@@ -94,50 +94,22 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
   @override
   void dispose() {
     _channel.setMethodCallHandler(null);
+    widget.onWebViewClosed?.call();
     super.dispose();
   }
 
-  void _notify(String title, {String? details, bool isError = false}) {
-    if (!mounted) return;
-
-    // Throttle to avoid spamming.
-    final now = DateTime.now();
-    if (now.difference(_lastSnackAt).inMilliseconds < 800) return;
-    _lastSnackAt = now;
-
-    final messenger = _scaffoldMessengerKey.currentState;
-    if (messenger == null) return;
-
-    final text = details == null ? title : '$title: $details';
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          backgroundColor: isError ? Colors.red.shade700 : Colors.blueGrey.shade800,
-          content: Text(
-            text,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      );
-  }
-
-  void _addDebug(String message, {bool popup = false, bool isError = false}) {
-    if (!mounted) return;
-    final ts = DateTime.now().toIso8601String().substring(11, 19);
+  /// Log debug messages (only shown if debugEnabled)
+  void _logDebug(String message) {
+    if (!widget.debugEnabled || !mounted) return;
+    
+    final timestamp = DateTime.now().toIso8601String().substring(11, 23);
     setState(() {
-      _debugLines.add('[$ts] $message');
-      if (_debugLines.length > 200) {
-        _debugLines.removeRange(0, _debugLines.length - 200);
+      _debugLines.add('[$timestamp] $message');
+      // Keep only last 100 lines for performance
+      if (_debugLines.length > 100) {
+        _debugLines.removeRange(0, _debugLines.length - 100);
       }
     });
-
-    if (popup) {
-      _notify('Debug', details: message, isError: isError);
-    }
   }
 
   void _setupMethodCallHandler() {
@@ -145,9 +117,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
       switch (call.method) {
         case 'onLog':
           final msg = (call.arguments as String?) ?? '';
-          _addDebug('NATIVE: $msg');
-          // Pop up native logs because user can't read device logs.
-          _addDebug('NATIVE: $msg', popup: true);
+          _logDebug('Native: $msg');
           return null;
 
         case 'onPageStarted':
@@ -158,7 +128,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = null;
           });
           widget.onPageStarted?.call(url);
-          _addDebug('Page started: $url', popup: true);
+          _logDebug('Page loading: $url');
           break;
 
         case 'onPageFinished':
@@ -168,7 +138,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _currentUrl = url;
           });
           widget.onPageFinished?.call(url);
-          _addDebug('Page finished: $url', popup: true);
+          _logDebug('Page loaded: $url');
           break;
 
         case 'onError':
@@ -178,233 +148,212 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
             _errorMessage = error;
           });
           widget.onError?.call(error);
-          _addDebug('ERROR: $error', popup: true, isError: true);
+          _logDebug('Error: $error');
           break;
 
         case 'isSupportESim':
-          _addDebug('JS Bridge called: isSupportESim', popup: true);
-          return await _handleIsSupportESim();
+          _logDebug('Bridge call: isSupportESim');
+          return await _handleCheckESimSupport();
 
         case 'installEsimProfile':
           final activationCode = call.arguments as String?;
-          _addDebug('JS Bridge called: installEsimProfile', popup: true);
-          return await _handleInstallEsimProfile(activationCode);
+          _logDebug('Bridge call: installEsimProfile');
+          return await _handleInstallESimProfile(activationCode);
 
         default:
-          _addDebug('Unknown method: ${call.method}', popup: true);
+          _logDebug('Unknown method: ${call.method}');
       }
       return null;
     });
   }
 
-  Future<String> _handleIsSupportESim() async {
+  Future<String> _handleCheckESimSupport() async {
     try {
       final isSupported = await _flutterEsim.isSupportESim(null);
-      _addDebug('eSIM Support: $isSupported');
+      _logDebug('eSIM support check: $isSupported');
       return '{"success":true,"isSupported":$isSupported}';
     } catch (e) {
-      _addDebug('Error checking eSIM support: $e');
+      _logDebug('eSIM support check failed: $e');
       return '{"success":false,"error":"${e.toString()}","isSupported":false}';
     }
   }
 
-  Future<String> _handleInstallEsimProfile(String? activationCode) async {
+  Future<String> _handleInstallESimProfile(String? activationCode) async {
     if (activationCode == null || activationCode.isEmpty) {
+      _logDebug('Install failed: no activation code');
       return '{"success":false,"error":"Activation code is required"}';
     }
 
     try {
-      _addDebug('Installing eSIM profile on platform...');
-      
-      // Platform-specific logic
-      // iOS: Open Universal Link in browser
-      // Android: Install directly via CTCellularPlanProvisioning
+      _logDebug('Installing eSIM profile...');
       final result = await _flutterEsim.installEsimProfile(activationCode);
-      _addDebug('Installation result: $result');
+      _logDebug('Installation result: $result');
       
       if (result) {
-        return '{"success":true,"message":"eSIM installation initiated successfully"}';
+        return '{"success":true,"message":"eSIM installation initiated"}';
       } else {
-        return '{"success":false,"error":"Failed to install eSIM profile"}';
+        return '{"success":false,"error":"Installation failed"}';
       }
     } catch (e) {
-      _addDebug('Error installing eSIM: $e');
+      _logDebug('Installation error: $e');
       return '{"success":false,"error":"${e.toString()}"}';
     }
   }
 
   Future<void> _reload() async {
     if (_viewId == null) {
-      _addDebug('Reload ignored: viewId is null');
+      _logDebug('Reload skipped: view not ready');
       return;
     }
     try {
       await _channel.invokeMethod('reload', {'viewId': _viewId});
-      _addDebug('Reload triggered');
+      _logDebug('Page reloaded');
     } catch (e) {
-      _addDebug('Reload error: $e');
+      _logDebug('Reload error: $e');
     }
   }
 
   Future<bool> _canGoBack() async {
-    if (_viewId == null) {
-      _addDebug('canGoBack=false (viewId is null)');
-      return false;
-    }
+    if (_viewId == null) return false;
     try {
       final result = await _channel.invokeMethod('canGoBack', {'viewId': _viewId});
       return result as bool? ?? false;
     } catch (e) {
-      _addDebug('CanGoBack error: $e');
+      _logDebug('Navigation check error: $e');
       return false;
     }
   }
 
   Future<void> _goBack() async {
     if (_viewId == null) {
-      _addDebug('goBack ignored: viewId is null');
+      _logDebug('Back navigation skipped: view not ready');
       return;
     }
     try {
       await _channel.invokeMethod('goBack', {'viewId': _viewId});
-      _addDebug('Go back triggered');
+      _logDebug('Navigated back');
     } catch (e) {
-      _addDebug('GoBack error: $e');
+      _logDebug('Back navigation error: $e');
     }
   }
 
-  Future<bool> _onWillPop() async {
-    _addDebug('WillPopScope: onWillPop called');
-    final canBack = await _canGoBack();
-    if (canBack) {
+  Future<bool> _handleBackNavigation() async {
+    final canNavigateBack = await _canGoBack();
+    if (canNavigateBack) {
       await _goBack();
-      return false;
+      return false; // Don't pop route
     }
-    _addDebug('WillPopScope: popping route');
-    return true;
+    return true; // Pop route
   }
 
   @override
   Widget build(BuildContext context) {
-    final webBody = Column(
-      children: [
-        // URL bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.grey[200],
-          child: Row(
-            children: [
-              const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _currentUrl,
-                  style: const TextStyle(fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Error message
-        if (_errorMessage != null)
+    return WillPopScope(
+      onWillPop: _handleBackNavigation,
+      child: Column(
+        children: [
+          // Clean URL bar
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Colors.red[100],
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.red),
+                if (_isLoading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                    _currentUrl,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => setState(() => _errorMessage = null),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
+                if (widget.debugEnabled)
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    onPressed: _reload,
+                    tooltip: 'Reload',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
               ],
             ),
           ),
 
-        // WebView
-        Expanded(
-          child: Stack(
-            children: [
-              _buildPlatformView(),
-              if (_showDebugOverlay)
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 8,
-                  child: _DebugOverlay(
-                    lines: _debugLines,
-                    onClear: () => setState(_debugLines.clear),
+          // Error banner
+          if (_errorMessage != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Colors.red[50],
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(color: Colors.red[700], fontSize: 13),
+                    ),
                   ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => setState(() => _errorMessage = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+            ),
 
-    final content = ScaffoldMessenger(
-      key: _scaffoldMessengerKey,
-      child: WillPopScope(
-        onWillPop: _onWillPop,
-        child: widget.showAppBar
-            ? Scaffold(
-                appBar: AppBar(
-                  title: Text(widget.title ?? 'eSIM WebView v2'),
-                  actions: [
-                    IconButton(
-                      icon: Icon(
-                        _showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined,
-                      ),
-                      onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
-                      tooltip: 'Toggle debug overlay',
+          // WebView
+          Expanded(
+            child: Stack(
+              children: [
+                _buildPlatformView(),
+                if (widget.debugEnabled && _debugLines.isNotEmpty)
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: _DebugConsole(
+                      lines: _debugLines,
+                      onClear: () => setState(_debugLines.clear),
                     ),
-                    if (_isLoading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _reload,
-                      tooltip: 'Reload',
-                    ),
-                  ],
-                ),
-                body: webBody,
-              )
-            : webBody,
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
-
-    return content;
   }
 
-  // Build platform-specific view
+  /// Build platform-specific WebView
   Widget _buildPlatformView() {
-    final creationParams = {
+    final creationParams = <String, dynamic>{
       'url': widget.initialUrl,
+      if (widget.initialCookies != null && widget.initialCookies!.isNotEmpty)
+        'cookies': widget.initialCookies,
+      if (widget.initialHeaders != null && widget.initialHeaders!.isNotEmpty)
+        'headers': widget.initialHeaders,
     };
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -416,8 +365,7 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
           if (!mounted) return;
           setState(() => _viewId = id);
           widget.onWebViewCreated?.call();
-          _addDebug('iOS UiKitView created with ID: $id');
-          _addDebug('Creation params: $creationParams');
+          _logDebug('iOS WebView created (ID: $id)');
         },
       );
     }
@@ -430,18 +378,18 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
         if (!mounted) return;
         setState(() => _viewId = id);
         widget.onWebViewCreated?.call();
-        _addDebug('AndroidView created with ID: $id');
-        _addDebug('Creation params: $creationParams');
+        _logDebug('Android WebView created (ID: $id)');
       },
     );
   }
 }
 
-class _DebugOverlay extends StatelessWidget {
+/// Clean debug console overlay (no icons, minimalist design)
+class _DebugConsole extends StatelessWidget {
   final List<String> lines;
   final VoidCallback onClear;
 
-  const _DebugOverlay({
+  const _DebugConsole({
     required this.lines,
     required this.onClear,
   });
@@ -451,39 +399,51 @@ class _DebugOverlay extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Container(
-        height: 180,
-        padding: const EdgeInsets.all(8),
+        height: 160,
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.75),
+          color: Colors.black.withOpacity(0.85),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: Colors.white24, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Debug',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                const Text(
+                  'Debug Console',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                const Spacer(),
                 TextButton(
                   onPressed: onClear,
-                  child: const Text('Clear', style: TextStyle(color: Colors.white)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Clear',
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Expanded(
               child: SingleChildScrollView(
+                reverse: true,
                 child: Text(
-                  lines.isEmpty ? 'No logs yet…' : lines.reversed.take(40).join('\n'),
+                  lines.isEmpty ? 'No logs yet' : lines.join('\n'),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
-                    height: 1.25,
+                    fontSize: 10,
+                    height: 1.3,
                     fontFamily: 'monospace',
                   ),
                 ),

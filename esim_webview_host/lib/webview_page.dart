@@ -18,8 +18,7 @@ class WebViewPage extends StatelessWidget {
         title: const Text('eSIM WebView v2'),
       ),
       body: FlutterEsimWebView(
-        initialUrl: url,
-        showAppBar: false,  // Hide SDK's AppBar to avoid double AppBar
+        initialUrl: url
       ),
     );
   }

@@ -1,74 +1,288 @@
-# Flutter eSIM Plugin
+# Flutter eSIM WebView SDK
 
-[![pub package](https://img.shields.io/pub/v/flutter_esim.svg)](https://pub.dev/packages/flutter_esim)
-[![GitHub stars](https://img.shields.io/github/stars/hiennguyen92/flutter_esim.svg?style=social)](https://github.com/hiennguyen92/flutter_esim/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/hiennguyen92/flutter_esim.svg?style=social)](https://github.com/hiennguyen92/flutter_esim/network)
-[![GitHub issues](https://img.shields.io/github/issues/hiennguyen92/flutter_esim.svg)](https://github.com/hiennguyen92/flutter_esim/issues)
-[![GitHub license](https://img.shields.io/github/license/hiennguyen92/flutter_esim.svg)](https://github.com/hiennguyen92/flutter_esim/blob/master/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-A Flutter plugin for checking eSIM support and installing eSIM profiles directly within your app.
+**Production-ready Flutter SDK for embedding WebView with eSIM installation capabilities.**
 
-## Table of Contents
+Includes JavaScript bridge for checking eSIM support and installing eSIM profiles on both Android and iOS devices.
 
-- [Getting Started](#getting-started)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Example](#example)
-- [API Reference](#api-reference)
-- [Contributing](#contributing)
-- [License](#license)
-- [WebView Integration](#webview-integration)
+## ✨ Features
 
-## Getting Started
+- ✅ **Simple API** - Only `initialUrl` required
+- ✅ **JavaScript Bridge** - Seamless communication between web and native
+- ✅ **Cookie & Header Injection** - Easy authentication integration
+- ✅ **Lifecycle Callbacks** - Track WebView creation, closure, and errors
+- ✅ **Debug Console** - Optional debug overlay for development
+- ✅ **Android Support** - SDK 28+ (Android 9.0+)
+- ✅ **iOS Support** - iOS 17.4+
+- ✅ **Production Ready** - Clean, documented, senior-level code
 
-To use this plugin, add `flutter_esim` as a dependency in your `pubspec.yaml` file.
+## 📦 Installation
+
+### Option 1: From Git Repository
 
 ```yaml
 dependencies:
-  flutter_esim: ^latest_version
+  flutter_esim:
+    git:
+      url: https://github.com/yourusername/flutter_esim.git
+      ref: main
 ```
 
-Then, run the command:
+### Option 2: Local Path
 
+```yaml
+dependencies:
+  flutter_esim:
+    path: ../flutter_esim
 ```
+
+Then run:
+```bash
 flutter pub get
 ```
 
-## Installation
-Make sure to follow the platform-specific setup for your project:
+## 🚀 Quick Start
 
-Android: No additional setup required.</br>
-iOS: No additional setup required.
+### 1. Import the SDK
 
-## Usage
-Import the library in your Dart file:
-```
+```dart
 import 'package:flutter_esim/flutter_esim.dart';
 ```
 
-Now you can use the FlutterEsim class to check eSIM support and install eSIM profiles.
+### 2. Use in Your App
 
-```
-// Check if the device supports eSIM
-// Does not require requesting entitlement approval from Apple (Manual checking)
-bool isEsimSupported = await FlutterEsim.isEsimSupported();
-
-// Check if the device supports eSIM
-// Does not require requesting entitlement approval from Apple (Manual checking)
-// You can add some devices that are not yet on the market that you want to check
-List<String> newer = ['iPhone18,4', 'iPhone19,4']
-bool isEsimSupported = await FlutterEsim.isEsimSupported(newer);
-
-// Install an eSIM profile
-// Require requesting entitlement approval from Apple
-bool installedSuccessfully = await FlutterEsim.installEsimProfile(profileData);
-
-// A piece of text containing simple steps for setting up eSIM.
-bool textInstructions = await FlutterEsim.instructions();
-
+```dart
+class MyWebViewPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('eSIM Purchase')),
+      body: FlutterEsimWebView(
+        initialUrl: 'https://your-esim-provider.com/purchase',
+      ),
+    );
+  }
+}
 ```
 
-### eSIM Integration Guidelines for iOS
+### 3. Add JavaScript Bridge in Your Web Page
+
+```javascript
+// Check eSIM support
+const result = await window.FlutterEsimBridge.isSupportESim();
+console.log('Supported:', result.isSupported);
+
+// Install eSIM
+const activationCode = 'LPA:1$smdp.example.com$code';
+const installResult = await window.FlutterEsimBridge.installEsimProfile(activationCode);
+console.log('Success:', installResult.isSuccess);
+```
+
+## 📚 Documentation
+
+- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Complete API reference and usage guide
+- **[INTEGRATION_EXAMPLE.md](INTEGRATION_EXAMPLE.md)** - 7 real-world integration examples
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Testing instructions
+
+## 📱 Platform Requirements
+
+| Platform | Minimum Version | Notes |
+|----------|----------------|-------|
+| Android  | SDK 28 (Android 9.0+) | eSIM hardware required |
+| iOS      | 17.4+ | iPhone XS and newer |
+
+## 🎯 Advanced Usage
+
+### With Authentication
+
+```dart
+FlutterEsimWebView(
+  initialUrl: 'https://example.com',
+  initialCookies: {'session': 'token123'},
+  initialHeaders: {'Authorization': 'Bearer token'},
+  onWebViewCreated: () => print('Ready'),
+  onWebViewClosed: () => print('Closed'),
+  onError: (error) => print('Error: $error'),
+  debugEnabled: true, // Show debug console
+)
+```
+
+### JavaScript Bridge API
+
+```javascript
+// Check support
+window.FlutterEsimBridge.isSupportESim()
+  .then(result => {
+    // result: {isSupported: bool, message: string, deviceModel: string}
+  });
+
+// Install eSIM
+window.FlutterEsimBridge.installEsimProfile(activationCode)
+  .then(result => {
+    // result: {isSuccess: bool, message: string}
+  });
+```
+
+## 📖 Complete Examples
+
+See [INTEGRATION_EXAMPLE.md](INTEGRATION_EXAMPLE.md) for:
+
+1. ✅ Basic eSIM purchase flow
+2. ✅ With authentication (cookies & headers)
+3. ✅ With loading progress and error handling
+4. ✅ Check eSIM support before opening WebView
+5. ✅ Production-ready with analytics
+6. ✅ Main app integration
+7. ✅ Backend integration (Node.js example)
+
+## 🔧 API Reference
+
+### FlutterEsimWebView Constructor
+
+```dart
+FlutterEsimWebView({
+  required String initialUrl,              // URL to load
+  Map<String, String>? initialCookies,     // Optional cookies
+  Map<String, String>? initialHeaders,     // Optional headers
+  ValueChanged<String>? onPageStarted,     // Page load started
+  ValueChanged<String>? onPageFinished,    // Page load finished
+  VoidCallback? onWebViewCreated,          // WebView created
+  VoidCallback? onWebViewClosed,           // WebView disposed
+  ValueChanged<String>? onError,           // Error occurred
+  bool debugEnabled = false,               // Show debug console
+})
+```
+
+## 🐛 Debug Mode
+
+Enable debug console in development:
+
+```dart
+FlutterEsimWebView(
+  initialUrl: url,
+  debugEnabled: true,  // Shows debug overlay with logs
+)
+```
+
+## 🔒 Security Best Practices
+
+1. ✅ Always use HTTPS in production
+2. ✅ Validate activation codes on backend
+3. ✅ Use secure cookies (HttpOnly, Secure, SameSite)
+4. ✅ Enable debug mode only in development (`kDebugMode`)
+5. ✅ Don't log sensitive data in production
+
+## 🧪 Testing
+
+Test on real devices (emulators don't support eSIM):
+
+```bash
+# Android
+flutter run -d <android-device-id>
+
+# iOS
+flutter run -d <ios-device-id>
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/flutter_esim/issues)
+- **Documentation**: See [USAGE_GUIDE.md](USAGE_GUIDE.md)
+- **Examples**: See [INTEGRATION_EXAMPLE.md](INTEGRATION_EXAMPLE.md)
+
+---
+
+## 📝 Migration from v1.x to v2.x
+
+### Breaking Changes
+
+#### 1. Parameter Names Changed
+
+```dart
+// OLD (v1.x)
+FlutterEsimWebView(
+  url: 'https://example.com',     // ❌ Deprecated
+  showAppBar: true,                // ❌ Removed
+)
+
+// NEW (v2.x)
+FlutterEsimWebView(
+  initialUrl: 'https://example.com',  // ✅ Use this instead
+  // Manage AppBar in parent Scaffold
+)
+```
+
+#### 2. New Features Added
+
+```dart
+// NEW in v2.x
+FlutterEsimWebView(
+  initialUrl: url,
+  
+  // NEW: Cookie and header injection
+  initialCookies: {'session': 'token'},
+  initialHeaders: {'Authorization': 'Bearer token'},
+  
+  // NEW: Lifecycle callbacks
+  onWebViewCreated: () => print('Created'),
+  onWebViewClosed: () => print('Closed'),
+  
+  // NEW: Debug control
+  debugEnabled: true,
+)
+```
+
+#### 3. Method Naming (Internal - No Action Required)
+
+Internal methods have been renamed for clarity, but this doesn't affect public API:
+- `_handleIsSupportESim` → `_handleCheckESimSupport`
+- `_handleInstallEsimProfile` → `_handleInstallESimProfile`
+- `_addDebug` → `_logDebug`
+
+### Platform Requirements Updated
+
+- **Android**: Now requires SDK 28+ (was SDK 22+)
+- **iOS**: Now requires iOS 17.4+ (was iOS 13.0+)
+
+### Testing After Migration
+
+1. Update your `pubspec.yaml` dependency
+2. Run `flutter pub get`
+3. Replace `url` parameter with `initialUrl`
+4. Remove `showAppBar` parameter (manage AppBar in your Scaffold)
+5. Test on real devices with updated platform versions
+
+---
+
+## 🔧 Legacy API (v1.x)
+
+If you still need the old API for direct eSIM operations without WebView:
+
+```dart
+import 'package:flutter_esim/flutter_esim.dart';
+
+// Check eSIM support (v1.x style)
+final plugin = FlutterEsim();
+final result = await plugin.isSupportESim();
+print('Supported: ${result['isSupported']}');
+
+// Install eSIM profile (v1.x style)
+final installResult = await plugin.installEsimProfile(activationCode);
+print('Success: ${installResult['isSuccess']}');
+```
+
+---
+
+Made with ❤️ by Flutter eSIM Team
 
 #### Compatibility Check:
 
