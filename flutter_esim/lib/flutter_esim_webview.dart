@@ -8,6 +8,14 @@ import 'flutter_esim.dart';
 class FlutterEsimWebView extends StatefulWidget {
   /// The initial URL to load in the WebView
   final String initialUrl;
+
+  /// Optional title to show in the built-in AppBar.
+  /// If null, a default title is used.
+  final String? title;
+
+  /// Whether this widget should render its own `Scaffold` + `AppBar`.
+  /// Set to false if the host app wants to provide its own AppBar.
+  final bool showAppBar;
   
   /// Optional callback when page starts loading
   final ValueChanged<String>? onPageStarted;
@@ -24,6 +32,8 @@ class FlutterEsimWebView extends StatefulWidget {
   const FlutterEsimWebView({
     super.key,
     required this.initialUrl,
+    this.title,
+    this.showAppBar = true,
     this.onPageStarted,
     this.onPageFinished,
     this.onError,
@@ -59,6 +69,10 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _addDebug('FlutterEsimWebView init: url=${widget.initialUrl}');
       _addDebug('Platform: $defaultTargetPlatform');
+
+      // Fingerprint: helps confirm the built artifact is running the expected code.
+      _addDebug('FINGERPRINT: FlutterEsimWebView_v2', popup: true);
+
       _notify('Init OK', details: widget.initialUrl);
     });
 
@@ -272,111 +286,119 @@ class _FlutterEsimWebViewState extends State<FlutterEsimWebView> {
 
   @override
   Widget build(BuildContext context) {
-    return ScaffoldMessenger(
-      key: _scaffoldMessengerKey,
-      child: WillPopScope(
-        onWillPop: _onWillPop,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('eSIM WebView v2'),
-            actions: [
-              IconButton(
-                icon: Icon(_showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined),
-                onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
-                tooltip: 'Toggle debug overlay',
-              ),
-              if (_isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _reload,
-                tooltip: 'Reload',
-              ),
-            ],
-          ),
-          body: Column(
+    final webBody = Column(
+      children: [
+        // URL bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.grey[200],
+          child: Row(
             children: [
-              // URL bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: Colors.grey[200],
-                child: Row(
-                  children: [
-                    const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _currentUrl,
-                        style: const TextStyle(fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Error message
-              if (_errorMessage != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.red[100],
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => setState(() => _errorMessage = null),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ),
-              
-              // WebView
+              const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+              const SizedBox(width: 8),
               Expanded(
-                child: Stack(
-                  children: [
-                    _buildPlatformView(),
-                    if (_showDebugOverlay)
-                      Positioned(
-                        left: 8,
-                        right: 8,
-                        bottom: 8,
-                        child: _DebugOverlay(
-                          lines: _debugLines,
-                          onClear: () => setState(_debugLines.clear),
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  _currentUrl,
+                  style: const TextStyle(fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
         ),
+
+        // Error message
+        if (_errorMessage != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: Colors.red[100],
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => setState(() => _errorMessage = null),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+
+        // WebView
+        Expanded(
+          child: Stack(
+            children: [
+              _buildPlatformView(),
+              if (_showDebugOverlay)
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                  child: _DebugOverlay(
+                    lines: _debugLines,
+                    onClear: () => setState(_debugLines.clear),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final content = ScaffoldMessenger(
+      key: _scaffoldMessengerKey,
+      child: WillPopScope(
+        onWillPop: _onWillPop,
+        child: widget.showAppBar
+            ? Scaffold(
+                appBar: AppBar(
+                  title: Text(widget.title ?? 'eSIM WebView v2'),
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        _showDebugOverlay ? Icons.bug_report : Icons.bug_report_outlined,
+                      ),
+                      onPressed: () => setState(() => _showDebugOverlay = !_showDebugOverlay),
+                      tooltip: 'Toggle debug overlay',
+                    ),
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _reload,
+                      tooltip: 'Reload',
+                    ),
+                  ],
+                ),
+                body: webBody,
+              )
+            : webBody,
       ),
     );
+
+    return content;
   }
 
   // Build platform-specific view
