@@ -13,26 +13,16 @@ class WebViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FlutterEsimWebView(
-      initialUrl: url,
-      onPageStarted: (url) {
-        debugPrint('📄 Page started: $url');
-      },
-      onPageFinished: (url) {
-        debugPrint('✅ Page finished: $url');
-      },
-      onError: (error) {
-        debugPrint('❌ Error: $error');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      },
-      onWebViewCreated: () {
-        debugPrint('🌐 WebView created successfully');
-      },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('eSIM WebView v2'),
+      ),
+      body: FlutterEsimWebView(
+        initialUrl: url,
+        // SDK builds its own Scaffold+AppBar; we keep host AppBar visible.
+        // If you want to hide the SDK AppBar, ensure you depend on the updated
+        // flutter_esim version that supports `showAppBar: false`.
+      ),
     );
   }
 }
