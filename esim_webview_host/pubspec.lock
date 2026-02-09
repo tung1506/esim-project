@@ -114,8 +114,8 @@ packages:
     dependency: "direct main"
     description:
       path: flutter_esim
-      ref: "8a9d061ada8791620a140de3540488401096969e"
-      resolved-ref: "8a9d061ada8791620a140de3540488401096969e"
+      ref: "618f9e8d75b90b7af70ec7946f937a12d0031574"
+      resolved-ref: "618f9e8d75b90b7af70ec7946f937a12d0031574"
       url: "https://github.com/tung1506/esim-project.git"
     source: git
     version: "0.0.4"

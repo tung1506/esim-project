@@ -41,7 +41,7 @@ dependencies:
     git:
       url: https://github.com/tung1506/esim-project.git
       path: flutter_esim
-      ref: 8a9d061ada8791620a140de3540488401096969e
+      ref: 618f9e8d75b90b7af70ec7946f937a12d0031574
     
   # Alternative: If flutter_esim is published to pub.dev
   # flutter_esim: ^1.0.0
