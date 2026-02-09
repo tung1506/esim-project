@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>eSIM Purchase - Powered by Flutter</title>
+    <title>eSIM Purchase</title>
     <style>
         * {
             box-sizing: border-box;
@@ -30,18 +30,18 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px 24px;
+            padding: 24px;
             text-align: center;
         }
         
         .header h1 {
-            font-size: 28px;
+            font-size: 24px;
             margin-bottom: 8px;
         }
         
         .header p {
             opacity: 0.9;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .content {
@@ -53,13 +53,35 @@
         }
         
         .section-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             color: #333;
             margin-bottom: 12px;
+        }
+        
+        .device-info {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .device-info-row {
             display: flex;
-            align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        
+        .device-info-label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .device-info-value {
+            font-family: 'Courier New', monospace;
+            color: #667eea;
         }
         
         .badge {
@@ -112,19 +134,15 @@
         
         button {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
         
         button:hover {
@@ -219,31 +237,28 @@
             box-shadow: 0 6px 20px rgba(117, 117, 117, 0.4);
         }
         
-        .icon {
-            width: 20px;
-            height: 20px;
-        }
-        
-        .spinner {
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top: 3px solid white;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .loading {
+            display: inline-block;
+            margin-left: 8px;
         }
         
         .footer {
-            padding: 20px;
+            padding: 16px;
             text-align: center;
             color: #757575;
-            font-size: 12px;
+            font-size: 11px;
             border-top: 1px solid #e0e0e0;
+        }
+        
+        .platform-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -307,8 +322,8 @@
         </div>
         
         <div class="footer">
-            Powered by Flutter eSIM Plugin | JS Bridge Active
-            <div id="platformInfo" style="margin-top: 8px; font-weight: 600;"></div>
+            Flutter eSIM Plugin
+            <div id="platformInfo"></div>
         </div>
     </div>
 
@@ -329,17 +344,25 @@
             return 'Unknown';
         }
         
+        // Update device info
+        function updateDeviceInfo() {
+            document.getElementById('platform').textContent = detectedPlatform;
+            document.getElementById('userAgent').textContent = navigator.userAgent.substring(0, 60) + '...';
+            document.getElementById('screenSize').textContent = `${screen.width}x${screen.height}`;
+            document.getElementById('language').textContent = navigator.language;
+            document.getElementById('online').textContent = navigator.onLine ? 'Yes' : 'No';
+        }
+        
         // Update platform info in footer
         function updatePlatformInfo(platform, method) {
             const platformInfo = document.getElementById('platformInfo');
-            const icon = platform === 'iOS' ? '🍎' : platform === 'Android' ? '🤖' : '❓';
-            platformInfo.innerHTML = `${icon} Platform: <span style="color: #667eea">${platform}</span> | Method: <span style="color: #764ba2">${method}</span>`;
+            platformInfo.innerHTML = `<div class="platform-badge">${platform} | ${method}</div>`;
         }
         
         // Log function with color coding
         function log(message, level = 'info') {
             const logDiv = document.getElementById('log');
-            const timestamp = new Date().toISOString();
+            const timestamp = new Date().toLocaleTimeString();
             
             if (logDiv.classList.contains('log-empty')) {
                 logDiv.classList.remove('log-empty');
@@ -353,17 +376,9 @@
                 event: '#ffd54f'
             };
             
-            const icons = {
-                info: 'ℹ️',
-                success: '✅',
-                error: '❌',
-                event: '📱'
-            };
-            
             const color = colors[level] || colors.info;
-            const icon = icons[level] || icons.info;
             
-            logDiv.innerHTML += `<span style="color: ${color}">${icon} [${timestamp}] ${message}</span>\n`;
+            logDiv.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span>\n`;
             logDiv.scrollTop = logDiv.scrollHeight;
             logCount++;
         }
@@ -550,7 +565,9 @@
         
         // Listen for bridge ready event
         window.addEventListener('flutterEsimBridgeReady', () => {
-            log('✅ flutterEsimBridgeReady event received', 'success');
+            log('Bridge ready event received', 'success');
+            document.getElementById('bridgeStatus').textContent = 'Ready';
+            document.getElementById('bridgeStatus').style.color = '#81c784';
         });
     </script>
 </body>

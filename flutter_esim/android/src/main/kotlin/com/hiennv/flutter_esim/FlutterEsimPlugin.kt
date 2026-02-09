@@ -86,21 +86,48 @@ class FlutterEsimPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plugi
             when (call.method) {
                 "isSupportESim" -> {
                     sendEvent("debug", mapOf("stage" to "isSupportESim_called"))
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        val isEnabled = mgr?.isEnabled ?: false
+                    
+                    // Check Android version - need Android 9+ (API 28+) for eSIM
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                         sendEvent("debug", mapOf(
-                            "stage" to "isSupportESim_result",
-                            "isEnabled" to isEnabled,
-                            "sdk" to Build.VERSION.SDK_INT
-                        ))
-                        result.success(isEnabled)
-                    } else {
-                        sendEvent("debug", mapOf(
-                            "stage" to "isSupportESim_unsupported",
+                            "stage" to "isSupportESim_unsupported_sdk",
                             "sdk" to Build.VERSION.SDK_INT
                         ))
                         result.success(false)
+                        return
                     }
+                    
+                    // Check if EuiccManager is available
+                    val euiccMgr = if (mgr != null) {
+                        mgr
+                    } else {
+                        try {
+                            context?.getSystemService(EUICC_SERVICE) as? EuiccManager
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    
+                    if (euiccMgr == null) {
+                        sendEvent("debug", mapOf(
+                            "stage" to "isSupportESim_no_euicc_manager",
+                            "sdk" to Build.VERSION.SDK_INT
+                        ))
+                        result.success(false)
+                        return
+                    }
+                    
+                    // Check if device hardware supports eSIM
+                    val isEnabled = euiccMgr.isEnabled
+                    
+                    sendEvent("debug", mapOf(
+                        "stage" to "isSupportESim_result",
+                        "isEnabled" to isEnabled,
+                        "sdk" to Build.VERSION.SDK_INT,
+                        "euiccId" to (euiccMgr.eid ?: "null")
+                    ))
+                    
+                    result.success(isEnabled)
                 }
                 "installEsimProfile" -> {
                     val activationCode = (call.arguments as? HashMap<*, *>)?.get("profile") as? String

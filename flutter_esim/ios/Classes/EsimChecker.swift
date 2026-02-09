@@ -107,13 +107,21 @@ class EsimChecker: NSObject {
     
     
     func isSupportESim(supportedModels: [String]) -> Bool {
-        let newSupportedModels = internalSupportedModels + supportedModels;
-        for model in newSupportedModels {
-            if identifier.contains(model) {
-                return true
+        // Check iOS version >= 17.4 (required for stable eSIM support)
+        if #available(iOS 17.4, *) {
+            // iOS version OK, now check device model
+            let newSupportedModels = internalSupportedModels + supportedModels;
+            for model in newSupportedModels {
+                if identifier.contains(model) {
+                    return true
+                }
             }
+            return false
+        } else {
+            // iOS version < 17.4, not supported
+            print("iOS version < 17.4, eSIM not supported")
+            return false
         }
-        return false
     }
     
     func installEsimProfile(address: String, matchingID: String?, oid: String?, confirmationCode: String?, iccid: String?, eid: String?) {

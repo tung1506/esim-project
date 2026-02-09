@@ -19,9 +19,7 @@ class WebViewPage extends StatelessWidget {
       ),
       body: FlutterEsimWebView(
         initialUrl: url,
-        // SDK builds its own Scaffold+AppBar; we keep host AppBar visible.
-        // If you want to hide the SDK AppBar, ensure you depend on the updated
-        // flutter_esim version that supports `showAppBar: false`.
+        showAppBar: false,  // Hide SDK's AppBar to avoid double AppBar
       ),
     );
   }
