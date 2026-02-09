@@ -110,9 +110,6 @@ class FlutterEsimWebView: NSObject, FlutterPlatformView, WKNavigationDelegate, W
         _webView.setNeedsLayout()
         _webView.layoutIfNeeded()
         
-        // Allow magnification
-        _webView.allowsMagnification = true
-        
         // Additional debugging
         print("🔧 Container bounds: \(_containerView.bounds)")
         print("🔧 WKWebView bounds: \(_webView.bounds)")
