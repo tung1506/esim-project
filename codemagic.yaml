@@ -63,8 +63,18 @@ workflows:
     name: Android Build (Test)
     max_build_duration: 60
     instance_type: mac_mini_m1
-   
-      
+
+    environment:
+      # BẮT BUỘC ghim: không ghim thì Codemagic dùng Flutter stable mới nhất,
+      # mà từ Flutter 3.29 trở đi packages/flutter_tools/gradle/build.gradle.kts
+      # áp dụng plugin `kotlin-dsl` → đòi Gradle >= 7.6.3. Project này đang
+      # xài Gradle 7.5 + AGP 7.3.0 nên build vỡ ngay khi cấu hình Gradle.
+      # Flutter 3.24.5 dùng flutter_tools gradle thuần Groovy → chạy được với 7.5.
+      flutter: 3.24.5
+      # Gradle 7.5 chỉ chạy tới Java 18; image mặc định có thể là Java 21 →
+      # ghim 17 cho chắc (AGP 7.3 cần Gradle >= 7.4, Java 17 cần Gradle >= 7.3).
+      java: 17
+
     triggering:
       events:
         - push
