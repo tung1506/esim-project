@@ -3,49 +3,49 @@ workflows:
     name: iOS Build
     max_build_duration: 120
     instance_type: mac_mini_m1
-    
+
+    # Tên integration App Store Connect API key đã tạo trong Codemagic
+    # (Teams/App settings → Integrations → Developer Portal).
+    # Phải khớp CHÍNH XÁC tên bạn đặt lúc thêm key, nếu không build fail ngay.
+    integrations:
+      app_store_connect: app_store_connect_key
+
     environment:
-      android_signing:
-        - keystore_reference
-      groups:
-        - app_store_credentials
+      # Ký iOS tự động: Codemagic dùng API key ở trên để tạo/lấy
+      # certificate + provisioning profile cho bundle id này.
+      ios_signing:
+        distribution_type: app_store   # đổi sang ad_hoc nếu muốn cài trực tiếp lên máy test
+        bundle_identifier: com.tung1506.esimwebviewhost
       vars:
         XCODE_WORKSPACE: "esim_webview_host/ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.tung1506.esimwebviewhost"
-        
-      # ✅ FIX: Specify exact Flutter version
-      flutter: 3.24.5  # ← Change from 'stable' to specific version
+
+      flutter: 3.24.5
       xcode: 15.4
       cocoapods: default
-      
+
     scripts:
-      - name: Get Flutter packages for flutter_esim
-        script: |
-          cd flutter_esim
-          flutter pub get
-          
       - name: Get Flutter packages for esim_webview_host
         script: |
           cd esim_webview_host
           flutter pub get
-          
+
       - name: Set up code signing
         script: |
           cd esim_webview_host
           xcode-project use-profiles
-          
-      - name: Install CocoaPods
-        script: |
-          cd esim_webview_host/ios
-          pod install
-          
+
+      # Không chạy `pod install` thủ công: repo chưa có ios/Podfile,
+      # file này do Flutter sinh ra trong lúc build. `flutter build ipa`
+      # tự chạy pod install sau khi sinh Podfile.
       - name: Build IPA
         script: |
           cd esim_webview_host
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
-            
+
+
     artifacts:
       - esim_webview_host/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
