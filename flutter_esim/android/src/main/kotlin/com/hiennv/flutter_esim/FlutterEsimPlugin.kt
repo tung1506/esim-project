@@ -124,7 +124,8 @@ class FlutterEsimPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, Plugi
                         "stage" to "isSupportESim_result",
                         "isEnabled" to isEnabled,
                         "sdk" to Build.VERSION.SDK_INT,
-                        "euiccId" to (euiccMgr.eid ?: "null")
+                        // getEid() cần carrier privileges, không có sẽ ném SecurityException
+                        "euiccId" to (runCatching { euiccMgr.eid }.getOrNull() ?: "unavailable")
                     ))
                     
                     result.success(isEnabled)
